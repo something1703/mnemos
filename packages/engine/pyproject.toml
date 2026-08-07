@@ -11,7 +11,7 @@ dependencies = [
 ]
 
 [project.scripts]
-mnemos-verify = "mnemos_engine.ledger.cli:main"
+mnemos-verify = "mnemos_engine.cli:main"
 
 [build-system]
 requires = ["hatchling"]

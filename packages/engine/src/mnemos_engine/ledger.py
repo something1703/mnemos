@@ -22,7 +22,7 @@ import psycopg
 from psycopg.types.json import Json
 
 from .canonical import GENESIS_HASH, entry_hash, merkle_root, payload_hash, shard_for
-from .errors import ChainBroken
+from .errors import ChainBroken, InvariantViolation
 from .models import Checkpoint, Op, VerificationResult
 
 log = logging.getLogger("mnemos.ledger")
@@ -61,6 +61,24 @@ async def append_audit(
     head = await cur.fetchone()
 
     if head is None:
+        # No head means this shard should be empty. If it is not, chain_heads
+        # and audit_chain disagree — the head was deleted, or entries were
+        # written by something that did not maintain it. Either way the chain is
+        # corrupt, and continuing would append a second seq 1 and surface as a
+        # unique-violation from deep inside a transaction. Say what is actually
+        # wrong instead.
+        await cur.execute(
+            "SELECT COALESCE(MAX(seq), 0) FROM mnemos.audit_chain "
+            "WHERE tenant_id = %s AND shard_id = %s",
+            (tenant_id, shard),
+        )
+        orphan = await cur.fetchone()
+        if orphan and int(orphan[0]) > 0:
+            raise InvariantViolation(
+                f"chain head missing for tenant {tenant_id} shard {shard}, but "
+                f"{orphan[0]} entries exist. chain_heads and audit_chain disagree; "
+                "run mnemos-verify and repair before writing."
+            )
         prev_seq, prev_hash = 0, GENESIS_HASH
     else:
         prev_seq, prev_hash = int(head[0]), bytes(head[1])
@@ -367,4 +385,4 @@ def _broken(
     )
 
 
-__all__ = ["ChainBroken", "append_audit", "checkpoint", "verify_chain"]
+__all__ = ["ChainBroken", "InvariantViolation", "append_audit", "checkpoint", "verify_chain"]

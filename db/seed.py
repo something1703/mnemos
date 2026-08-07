@@ -33,9 +33,10 @@ from datetime import UTC, datetime, timedelta
 
 try:
     import psycopg
+    from mnemos_engine.canonical import GENESIS_HASH, entry_hash, payload_hash
     from psycopg.types.json import Json
 except ModuleNotFoundError:  # pragma: no cover
-    sys.exit("psycopg is not installed. Run: uv sync --all-packages --group dev")
+    sys.exit("dependencies missing. Run: uv sync --all-packages --group dev")
 
 EMBED_DIM = 1024
 CHAIN_SHARDS = 16
@@ -302,39 +303,81 @@ class Seeder:
     def audit(
         self, cur: psycopg.Cursor, tenant_id: uuid.UUID, op: str, subject_key: str
     ) -> uuid.UUID:
-        """Append a real audit row and arm its ticket for this transaction."""
+        """Append a real, verifiable audit row and arm its ticket.
+
+        Uses the engine's canonical hashing and maintains chain_heads, so seeded
+        data passes `mnemos-verify` exactly as production data does.
+
+        An earlier version hashed `repr(sorted(payload.items()))` and never
+        chained prev_hash — which produced rows the verifier correctly reported
+        as edited. Seed data that fails verification is worse than no seed data:
+        a judge running mnemos-verify on the demo tenant would see BROKEN and
+        conclude, reasonably, that the whole mechanism is theatre.
+        """
         ticket = uuid.uuid4()
         shard = shard_for(subject_key)
         cur.execute(f"SET LOCAL app.tenant_id = '{tenant_id}'")
+
         cur.execute(
-            "SELECT COALESCE(MAX(seq), 0) + 1 FROM mnemos.audit_chain "
-            "WHERE tenant_id = %s AND shard_id = %s",
+            "SELECT seq, entry_hash FROM mnemos.chain_heads "
+            "WHERE tenant_id = %s AND shard_id = %s FOR UPDATE",
             (tenant_id, shard),
         )
-        row = cur.fetchone()
-        seq = row[0] if row else 1
-        payload = {"op": op, "subject": subject_key, "seeded": True}
-        payload_hash = hashlib.sha256(repr(sorted(payload.items())).encode()).digest()
+        head = cur.fetchone()
+        if head is None:
+            # Unlike the engine (which refuses), the seed repairs: it may run
+            # against a database written by an older version whose audit rows
+            # predate chain_heads. Falling back to MAX(seq) avoids colliding
+            # with those rows while --reset clears them.
+            cur.execute(
+                "SELECT COALESCE(MAX(seq), 0) FROM mnemos.audit_chain "
+                "WHERE tenant_id = %s AND shard_id = %s",
+                (tenant_id, shard),
+            )
+            orphan = cur.fetchone()
+            prev_seq, prev_hash = (int(orphan[0]) if orphan else 0), GENESIS_HASH
+        else:
+            prev_seq, prev_hash = int(head[0]), bytes(head[1])
+        seq = prev_seq + 1
+
+        # Byte-identical to mnemos_engine.ledger.append_audit. If these ever
+        # diverge, seeded chains stop verifying — which is the alarm we want.
+        body = {
+            "op": op,
+            "actor": "seed",
+            "subject_key": subject_key,
+            "reason": None,
+            "seq": seq,
+            "shard_id": shard,
+            "tenant_id": str(tenant_id),
+            "data": {"seeded": True},
+        }
+        digest = payload_hash(body)
+        entry = entry_hash(digest, prev_hash)
+
         cur.execute(
             """
             INSERT INTO mnemos.audit_chain
-                (tenant_id, shard_id, seq, ticket, op, subject_key, actor,
+                (tenant_id, shard_id, seq, ticket, op, subject_key, actor, reason,
                  payload, payload_hash, prev_hash, entry_hash)
-            VALUES (%s, %s, %s, %s, %s, %s, 'seed', %s::JSONB, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, 'seed', NULL, %s, %s, %s, %s)
             """,
-            (
-                tenant_id,
-                shard,
-                seq,
-                ticket,
-                op,
-                subject_key,
-                Json(payload),
-                payload_hash,
-                b"\x00" * 32,
-                hashlib.sha256(payload_hash).digest(),
-            ),
+            (tenant_id, shard, seq, ticket, op, subject_key, Json(body), digest, prev_hash, entry),
         )
+
+        if head is None:
+            cur.execute(
+                "INSERT INTO mnemos.chain_heads (tenant_id, shard_id, seq, entry_hash) "
+                "VALUES (%s, %s, %s, %s)",
+                (tenant_id, shard, seq, entry),
+            )
+        else:
+            cur.execute(
+                "UPDATE mnemos.chain_heads SET seq = %s, entry_hash = %s, updated_at = now() "
+                "WHERE tenant_id = %s AND shard_id = %s",
+                (seq, entry, tenant_id, shard),
+            )
+
         cur.execute(f"SET LOCAL app.audit_ticket = '{ticket}'")
         return ticket
 
@@ -530,8 +573,12 @@ def main() -> int:
     with psycopg.connect(args.url, autocommit=False, connect_timeout=15) as conn:
         seeder = Seeder(conn)
         if args.reset:
-            with conn.transaction():
-                seeder.reset()
+            seeder.reset()
+            # Committed before seeding starts. Sharing a transaction with the
+            # seed means a seeding failure silently rolls the teardown back, and
+            # the next run then collides with the rows it thought it removed —
+            # which is exactly how this was first discovered.
+            conn.commit()
         print("seeding:")
         for seed in SEEDS:
             seeder.seed_tenant(seed)
