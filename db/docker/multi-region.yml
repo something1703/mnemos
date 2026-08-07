@@ -1,0 +1,119 @@
+# A 9-node CockroachDB cluster across three simulated jurisdictions.
+#
+# CockroachDB Cloud Basic is single-region, so residency (pillar I) and
+# node-kill resilience cannot be demonstrated there. This rig is where both are
+# real: rows are homed by REGIONAL BY ROW, `SURVIVE REGION FAILURE` is set, and
+# `docker kill` on a whole region during live writes loses nothing.
+#
+# The regions are simulated via --locality. No data leaves this machine, and the
+# three names match MNEMOS_REGIONS so residency policies are identical to the
+# ones the cloud tenant uses.
+#
+#   make db-multiregion    bring up + init
+#   make db-down           tear down
+#
+# Resources: 9 nodes at ~512MiB each. Give Docker Desktop >=6GB or use
+# db/docker/single-node.yml, which is enough for everything except residency
+# and node-kill work.
+
+x-crdb: &crdb
+  image: cockroachdb/cockroach:v26.2.5   # pinned to Cloud; see ADR-007
+  command: >
+    start
+    --insecure
+    --store=type=mem,size=512MiB
+    --join=crdb-us-1:26357,crdb-eu-1:26357,crdb-ap-1:26357
+    --listen-addr=:26357
+    --sql-addr=:26257
+    --advertise-addr=$${HOSTNAME}:26357
+  restart: unless-stopped
+
+services:
+  # ---- us-east-1 -----------------------------------------------------------
+  crdb-us-1:
+    <<: *crdb
+    hostname: crdb-us-1
+    command: >
+      start --insecure --store=type=mem,size=512MiB
+      --join=crdb-us-1:26357,crdb-eu-1:26357,crdb-ap-1:26357
+      --listen-addr=:26357 --sql-addr=:26257 --advertise-addr=crdb-us-1:26357
+      --locality=region=us-east-1,zone=a
+    ports: ["26357:26257", "8081:8080"]
+  crdb-us-2:
+    <<: *crdb
+    hostname: crdb-us-2
+    command: >
+      start --insecure --store=type=mem,size=512MiB
+      --join=crdb-us-1:26357,crdb-eu-1:26357,crdb-ap-1:26357
+      --listen-addr=:26357 --sql-addr=:26257 --advertise-addr=crdb-us-2:26357
+      --locality=region=us-east-1,zone=b
+  crdb-us-3:
+    <<: *crdb
+    hostname: crdb-us-3
+    command: >
+      start --insecure --store=type=mem,size=512MiB
+      --join=crdb-us-1:26357,crdb-eu-1:26357,crdb-ap-1:26357
+      --listen-addr=:26357 --sql-addr=:26257 --advertise-addr=crdb-us-3:26357
+      --locality=region=us-east-1,zone=c
+
+  # ---- eu-central-1 --------------------------------------------------------
+  crdb-eu-1:
+    <<: *crdb
+    hostname: crdb-eu-1
+    command: >
+      start --insecure --store=type=mem,size=512MiB
+      --join=crdb-us-1:26357,crdb-eu-1:26357,crdb-ap-1:26357
+      --listen-addr=:26357 --sql-addr=:26257 --advertise-addr=crdb-eu-1:26357
+      --locality=region=eu-central-1,zone=a
+    ports: ["26358:26257"]
+  crdb-eu-2:
+    <<: *crdb
+    hostname: crdb-eu-2
+    command: >
+      start --insecure --store=type=mem,size=512MiB
+      --join=crdb-us-1:26357,crdb-eu-1:26357,crdb-ap-1:26357
+      --listen-addr=:26357 --sql-addr=:26257 --advertise-addr=crdb-eu-2:26357
+      --locality=region=eu-central-1,zone=b
+  crdb-eu-3:
+    <<: *crdb
+    hostname: crdb-eu-3
+    command: >
+      start --insecure --store=type=mem,size=512MiB
+      --join=crdb-us-1:26357,crdb-eu-1:26357,crdb-ap-1:26357
+      --listen-addr=:26357 --sql-addr=:26257 --advertise-addr=crdb-eu-3:26357
+      --locality=region=eu-central-1,zone=c
+
+  # ---- ap-south-1 ----------------------------------------------------------
+  crdb-ap-1:
+    <<: *crdb
+    hostname: crdb-ap-1
+    command: >
+      start --insecure --store=type=mem,size=512MiB
+      --join=crdb-us-1:26357,crdb-eu-1:26357,crdb-ap-1:26357
+      --listen-addr=:26357 --sql-addr=:26257 --advertise-addr=crdb-ap-1:26357
+      --locality=region=ap-south-1,zone=a
+    ports: ["26359:26257"]
+  crdb-ap-2:
+    <<: *crdb
+    hostname: crdb-ap-2
+    command: >
+      start --insecure --store=type=mem,size=512MiB
+      --join=crdb-us-1:26357,crdb-eu-1:26357,crdb-ap-1:26357
+      --listen-addr=:26357 --sql-addr=:26257 --advertise-addr=crdb-ap-2:26357
+      --locality=region=ap-south-1,zone=b
+  crdb-ap-3:
+    <<: *crdb
+    hostname: crdb-ap-3
+    command: >
+      start --insecure --store=type=mem,size=512MiB
+      --join=crdb-us-1:26357,crdb-eu-1:26357,crdb-ap-1:26357
+      --listen-addr=:26357 --sql-addr=:26257 --advertise-addr=crdb-ap-3:26357
+      --locality=region=ap-south-1,zone=c
+
+  init:
+    image: cockroachdb/cockroach:v26.2.5
+    depends_on: [crdb-us-1, crdb-eu-1, crdb-ap-1]
+    entrypoint: ["/bin/bash", "-c"]
+    command: >
+      "sleep 8 && ./cockroach init --insecure --host=crdb-us-1:26357 || true"
+    restart: "no"

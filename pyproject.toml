@@ -78,6 +78,7 @@ markers = [
     "cloud: requires a live CockroachDB Cloud cluster",
     "rig: requires the 9-node multi-region rig (make db-multiregion)",
     "aws: requires live AWS credentials",
+    "security: adversarial isolation and attack-surface tests",
     "slow: excluded from the default PR run",
 ]
 
