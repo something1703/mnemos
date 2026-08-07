@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned to the CockroachDB Cloud cluster version. See ADR-007 — local, CI,
+  # and cloud must never drift, or a capability passes in CI and fails in the demo.
+  CRDB_VERSION: v26.2.5
+
+jobs:
+  invariants:
+    # Runs first and alone: if an invariant is broken, nothing else matters.
+    name: Sacred invariants (static)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Invariant 1a — no destructive SQL outside the Warden
+        run: make no-delete-in-engine
+      - name: Invariant 1b — no model dependency inside the Warden
+        run: make no-model-in-warden
+
+  quality:
+    name: Lint, format, typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --all-packages --group dev
+      - run: make lint
+      - run: make typecheck
+
+  test:
+    name: Tests (CockroachDB ${{ github.workflow }})
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Start CockroachDB
+        # Uses the same compose file developers use, so "works in CI" and
+        # "works on my machine" cannot diverge.
+        run: make db-local
+
+      - name: Verify cluster capabilities
+        # The probe is a test, not a chore: if a CockroachDB upgrade removes a
+        # capability the design depends on, CI says so before a human notices.
+        run: |
+          uv run python db/scripts/probe.py \
+            --url 'postgresql://root@localhost:26257/defaultdb?sslmode=disable' \
+            --strict
+
+      - name: Fail if the capability report drifted
+        # docs/cluster-capabilities.md is generated. If it changed, the cluster
+        # changed, and that belongs in a commit with an ADR — not as a surprise.
+        run: git diff --exit-code docs/cluster-capabilities.md
+
+      - run: uv sync --all-packages --group dev
+      - run: make cov
+        env:
+          MNEMOS_DB_URL_LOCAL: postgresql://root@localhost:26257/mnemos?sslmode=disable
+
+  redteam:
+    name: Red team regression subset
+    runs-on: ubuntu-latest
+    # Phase 10 populates this. Until then the directory is empty and the job
+    # is a no-op that keeps the slot visible in every PR.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --all-packages --group dev
+      - run: make db-local
+      - run: |
+          if [ -n "$(find redteam -name 'test_*.py' 2>/dev/null)" ]; then
+            make redteam-ci
+          else
+            echo "redteam/ is empty — populated in Phase 10"
+          fi
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # gitleaks must see the whole history, not just the tip
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

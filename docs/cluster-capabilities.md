@@ -4,18 +4,18 @@
 > This file is the evidence behind ADR-006. Every capability below was
 > verified by executing real DDL against the live cluster, not read from docs.
 
-**Probed:** 2026-08-07 14:57 UTC
+**Probed:** 2026-08-07 16:39 UTC
 
 ## Cluster
 
 | Property | Value |
 |---|---|
-| `version` | `CockroachDB CCL v25.3.0 (aarch64-unknown-linux-gnu, built 2025/08/14 18:25:20, go1.23.7 X:nocoverageredesign)` |
+| `version` | `CockroachDB CCL v26.2.5 (x86_64-pc-linux-gnu, built 2026/07/28 18:56:00, go1.25.5)` |
 | `current_database` | `defaultdb` |
-| `current_user` | `root` |
-| `cluster_id` | `73737cf4-a11e-4d7a-8102-9c023029f499` |
-| `default_gc_ttlseconds` | `ALTER RANGE default CONFIGURE ZONE USING range_min_bytes = 134217728, range_max_bytes = 536870912, gc.ttlseconds = 14400, num_replicas = 1, constraints = '[]', lease_preferences = '[]'` |
-| `temporal_recall_window` | `14400s (~4.0h) — the hard limit on recall_as_of(); see Phase 06.3 for extending it under legal hold` |
+| `current_user` | `rudrararaa` |
+| `cluster_id` | `unavailable — Access to crdb_internal and system is restricted.` |
+| `default_gc_ttlseconds` | `ALTER RANGE default CONFIGURE ZONE USING range_min_bytes = 134217728, range_max_bytes = 536870912, gc.ttlseconds = 4500, num_replicas = 3, num_voters = 3, constraints = '{+region=aws-us-east-1: 3}', voter_constraints = '[]', lease_preferences = '[[+region=aws-us-east-1]]'` |
+| `temporal_recall_window` | `4500s (~1.2h) — the hard limit on recall_as_of(); see Phase 06.3 for extending it under legal hold` |
 
 ## Capabilities
 

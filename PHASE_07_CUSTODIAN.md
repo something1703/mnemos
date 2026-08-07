@@ -26,15 +26,32 @@ and it can never destroy any.
       `reviewing-cluster-health`, `analyzing-range-distribution`, and the
       `cockroachdb-sql` schema-review skill (reused from Phase 02.9, now run
       continuously rather than once).
-- [ ] Extract each skill's diagnostic SQL from its `references/` into an
-      **allowlist**. The Custodian may execute nothing else — not generated
-      SQL, not parameterized variants beyond declared bind slots. The LLM
-      chooses *which* allowlisted query to run and interprets the result; it
-      never composes SQL. This is the structural answer to prompt injection
-      in the ops loop.
-**Accept:** loader test enumerates every skill and its allowlisted queries;
-a test proves an attempt to execute non-allowlisted SQL is rejected before
-it reaches the MCP client.
+- [ ] **ADR-011 changed this design.** The Phase 02.1 probe found that
+      `crdb_internal` and `system` are restricted on CockroachDB Cloud Basic
+      (`Access to crdb_internal and system is restricted`), and the ops skills
+      lean heavily on `crdb_internal`. Their raw SQL largely cannot run on our
+      cluster.
+
+      So the allowlist is **the Cloud MCP server's purpose-built tools**, not
+      SQL strings parsed out of markdown: `show_running_queries`,
+      `show_statement`, `explain_query`, `get_table_schema`, `list_tables`,
+      `list_databases`. Each skill's `SKILL.md` triage guidance becomes the
+      interpretation prompt. The skills supply the expertise; the MCP server
+      supplies the safe accessors.
+
+      This is the better design anyway — a vendor-maintained tool surface has
+      no SQL-injection surface at all, and it works identically on Basic,
+      Standard, and Advanced.
+- [ ] Skill diagnostics with no MCP equivalent are **skipped and logged as
+      unavailable**, never silently omitted. The count of skipped diagnostics
+      appears in each sweep's record; silent partial coverage reads as full
+      coverage, which is the failure mode Phase 10.7 exists to prevent.
+- [ ] This finding is genuine, specific feedback for the sponsor's optional
+      feedback field — record it in `docs/feedback.md` as it happens.
+**Accept:** loader test enumerates every skill and the MCP tools it maps to;
+a test proves an attempt to call a non-allowlisted tool is rejected before it
+reaches the MCP client; a test proves an unavailable diagnostic is reported,
+not dropped.
 
 ## Sub-phase 7.2 — MCP client (CockroachDB Cloud side)
 - [ ] MCP client to `https://cockroachlabs.cloud/mcp` with service-account

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mnemos — brand sample</title>
+<link rel="icon" href="favicon.svg" />
+<link rel="stylesheet" href="tokens.css" />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700&family=Albert+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: var(--space-12) var(--space-8);
+    background: var(--abyss); color: var(--parchment);
+    font-family: var(--font-body); font-size: var(--step-0);
+    line-height: var(--leading-body);
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 68rem; margin: 0 auto; }
+  h1, h2, h3 { font-family: var(--font-display); letter-spacing: var(--tracking-display); line-height: var(--leading-tight); margin: 0; }
+  h1 { font-size: var(--step-4); }
+  h2 { font-size: var(--step-2); margin-top: var(--space-12); }
+  h3 { font-size: var(--step-1); margin-top: var(--space-6); }
+  p { color: var(--moonstone); max-width: 60ch; }
+  code, .mono { font-family: var(--font-mono); font-size: var(--step--1); }
+  hr { border: 0; border-top: 1px solid var(--hairline); margin: var(--space-8) 0; }
+
+  .grid { display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); margin-top: var(--space-4); }
+  .card { background: var(--veil); border: 1px solid var(--hairline); border-radius: var(--radius-lg); padding: var(--space-4); }
+
+  .swatch { height: 3.5rem; border-radius: var(--radius); margin-bottom: var(--space-3); }
+  .meta { display: flex; justify-content: space-between; gap: var(--space-2); color: var(--dim); }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: var(--space-2);
+    padding: 0.2rem 0.6rem; border-radius: 999px;
+    font-size: var(--step--1); font-weight: 500;
+    border: 1px solid; background: var(--veil);
+  }
+  .b-trusted      { color: var(--synapse); border-color: var(--synapse-edge); background: var(--synapse-fill); }
+  .b-corroborated { color: var(--synapse); border-color: var(--synapse-edge); background: transparent; }
+  .b-unverified   { color: var(--umbra);   border-color: var(--umbra-edge);   background: var(--umbra-fill); }
+  .b-contested    { color: var(--umbra);   border-color: var(--umbra-edge);   background: transparent; }
+  .b-quarantined  { color: var(--signal);  border-color: var(--signal-edge);  background: var(--signal-fill); }
+
+  button { font: inherit; font-weight: 600; border-radius: var(--radius); padding: 0.55rem 1rem; cursor: pointer; border: 1px solid; transition: background var(--dur) var(--ease); }
+  .btn-read { color: var(--abyss); background: var(--synapse); border-color: var(--synapse); }
+  .btn-write { color: var(--abyss); background: var(--ember); border-color: var(--ember); }
+  .btn-ghost { color: var(--parchment); background: transparent; border-color: var(--hairline); }
+  .btn-destroy { color: var(--parchment); background: var(--signal); border-color: var(--signal); }
+  button:focus-visible { outline: none; box-shadow: var(--ring); }
+
+  /* ---- the memory trace ---- */
+  .trace { display: flex; align-items: center; gap: 0; padding: var(--space-6) 0; overflow-x: auto; }
+  .node { width: 11px; height: 11px; border-radius: 50%; flex: none; }
+  .link { width: 34px; height: 2px; flex: none; background: var(--hairline); }
+  .link.erased { background: none; border-top: 2px dashed var(--signal); opacity: 0.75; }
+  .anchor { width: 19px; height: 19px; border-radius: 5px; flex: none; border: 2px solid var(--parchment); background: var(--veil-hi); }
+  .n-ember { background: var(--ember); } .n-synapse { background: var(--synapse); }
+  .n-signal { background: var(--signal); } .n-umbra { background: var(--umbra); }
+
+  .legend { display: flex; flex-wrap: wrap; gap: var(--space-4); color: var(--dim); font-size: var(--step--1); }
+  .legend span { display: inline-flex; align-items: center; gap: var(--space-2); }
+</style>
+</head>
+<body>
+<main>
+
+  <img src="logotype.svg" alt="Mnemos" width="300" />
+  <h1 style="margin-top:var(--space-6)">Accountable Memory for Agents</h1>
+  <p style="font-size:var(--step-1)">
+    Agents don't fail when they're wrong. They fail when they forget — or when
+    they remember what they never should have.
+  </p>
+
+  <hr />
+
+  <h2>Surfaces &amp; text</h2>
+  <div class="grid">
+    <div class="card"><div class="swatch" style="background:var(--abyss);border:1px solid var(--hairline)"></div><div class="meta"><span>abyss</span><code>#12172B</code></div></div>
+    <div class="card"><div class="swatch" style="background:var(--veil)"></div><div class="meta"><span>veil</span><code>#232B45</code></div></div>
+    <div class="card"><div class="swatch" style="background:var(--parchment)"></div><div class="meta"><span>parchment</span><code>14.8:1</code></div></div>
+    <div class="card"><div class="swatch" style="background:var(--moonstone)"></div><div class="meta"><span>moonstone</span><code>7.4:1</code></div></div>
+  </div>
+
+  <h2>The four accents</h2>
+  <p>Colour encodes a system operation. It is never decorative.</p>
+  <div class="grid">
+    <div class="card"><div class="swatch" style="background:var(--synapse)"></div><strong>synapse</strong><div class="meta"><span>reading memory</span><code>10.9:1</code></div></div>
+    <div class="card"><div class="swatch" style="background:var(--ember)"></div><strong>ember</strong><div class="meta"><span>writing memory</span><code>8.7:1</code></div></div>
+    <div class="card"><div class="swatch" style="background:var(--signal)"></div><strong>signal</strong><div class="meta"><span>destroying memory</span><code>5.3:1</code></div></div>
+    <div class="card"><div class="swatch" style="background:var(--umbra)"></div><strong>umbra</strong><div class="meta"><span>doubting memory</span><code>5.1:1</code></div></div>
+  </div>
+
+  <h2>Trust states</h2>
+  <p>
+    Every state carries a colour, a label, and a shape — so the lattice stays
+    legible in greyscale and to a colour-blind viewer.
+  </p>
+  <p style="display:flex;gap:var(--space-3);flex-wrap:wrap">
+    <span class="badge b-trusted">● Trusted</span>
+    <span class="badge b-corroborated">◌ Corroborated</span>
+    <span class="badge b-unverified">◆ Unverified</span>
+    <span class="badge b-contested">◈ Contested</span>
+    <span class="badge b-quarantined">⊠ Quarantined</span>
+  </p>
+
+  <h2>The memory trace</h2>
+  <p>
+    Each dot is one committed audit row, tinted by operation. The dashed link is
+    an erasure. The square is a Merkle checkpoint — drawn heavier because it is
+    literally anchored to WORM storage in S3.
+  </p>
+  <div class="trace">
+    <div class="node n-ember"></div><div class="link"></div>
+    <div class="node n-ember"></div><div class="link"></div>
+    <div class="node n-synapse"></div><div class="link"></div>
+    <div class="node n-umbra"></div><div class="link"></div>
+    <div class="anchor" title="Merkle checkpoint — anchored to S3 Object Lock"></div><div class="link"></div>
+    <div class="node n-synapse"></div><div class="link erased"></div>
+    <div class="node n-signal"></div><div class="link"></div>
+    <div class="node n-ember"></div><div class="link"></div>
+    <div class="node n-synapse"></div><div class="link"></div>
+    <div class="anchor"></div>
+  </div>
+  <div class="legend">
+    <span><i class="node n-ember"></i> consolidate</span>
+    <span><i class="node n-synapse"></i> recall</span>
+    <span><i class="node n-umbra"></i> demote</span>
+    <span><i class="node n-signal"></i> forget</span>
+    <span><i class="anchor" style="width:12px;height:12px"></i> checkpoint</span>
+  </div>
+
+  <h2>Controls</h2>
+  <p style="display:flex;gap:var(--space-3);flex-wrap:wrap;align-items:center">
+    <button class="btn-read">Recall</button>
+    <button class="btn-write">Consolidate now</button>
+    <button class="btn-ghost">Cancel</button>
+    <button class="btn-destroy">Forget subject</button>
+  </p>
+  <p style="color:var(--dim);font-size:var(--step--1)">
+    Signal red is a button background in exactly one place: the confirm control
+    in the Forget and Revoke flows.
+  </p>
+
+  <h2>Type</h2>
+  <h3 style="font-family:var(--font-display)">Bricolage Grotesque — display</h3>
+  <p>Albert Sans — body. Quiet, high legibility at small sizes.</p>
+  <p class="mono" style="color:var(--moonstone)">
+    Spline Sans Mono — machine-authored, verifiable values.<br />
+    subject: patient:8f2c1a &nbsp; region: aws-eu-central-1 &nbsp; shard/seq: 3/1471<br />
+    prev: 9f86d081884c7d65…2b0c55 &nbsp; anchor: s3://mnemos-anchor/demo/2026-08-07T14
+  </p>
+
+  <hr />
+  <p style="color:var(--dim);font-size:var(--step--1)">
+    Locked at Phase 01.3 · ADR-004 · see BRAND.md
+  </p>
+</main>
+</body>
+</html>

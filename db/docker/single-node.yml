@@ -8,7 +8,10 @@
 
 services:
   crdb:
-    image: cockroachdb/cockroach:v25.3.0
+    # Matches the CockroachDB Cloud Basic cluster (v26.2.5, verified via the
+    # MCP get_cluster call on 2026-08-07). Bump both together — never let local
+    # drift from cloud, or a capability probe passes here and fails in the demo.
+    image: cockroachdb/cockroach:v26.2.5
     container_name: mnemos-crdb
     command: start-single-node --insecure --store=type=mem,size=2GiB
     ports:

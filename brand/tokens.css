@@ -1,0 +1,105 @@
+/* Mnemos brand tokens — LOCKED at Phase 01.3 (ADR-004).
+ *
+ * The four accents are semantic, not decorative. Color always encodes a system
+ * operation, so a viewer can read state from a screenshot:
+ *
+ *   synapse  teal    reading memory      recall, live data, links
+ *   ember    amber   writing memory      consolidation, strength, the sleep cycle
+ *   signal   red     destroying memory   forget, revoke, critical findings
+ *   umbra    violet  doubting memory     unverified, quarantined, contested
+ *
+ * Never introduce a new color or typeface. If something needs a color that is
+ * not here, it needs a clearer meaning instead.
+ *
+ * Accessibility: color is never the sole carrier of meaning. Every trust state
+ * also has a label and a shape (see BRAND.md), so the system survives color
+ * blindness and greyscale printing. Contrast ratios below are against --abyss.
+ */
+
+:root {
+  /* ---- Surfaces: layered translucency, not flat black ---- */
+  --abyss: #12172b; /* app background */
+  --veil: #232b45; /* raised surfaces, cards */
+  --veil-hi: #2d3752; /* hover / active surface */
+  --hairline: #36415f; /* 1px borders, dividers */
+
+  /* ---- Text ---- */
+  --parchment: #edeff7; /* primary text        — 14.8:1 */
+  --moonstone: #a8b3cf; /* secondary text      —  7.4:1 */
+  --dim: #6f7b9b; /* tertiary, disabled  —  3.6:1, never body text */
+
+  /* ---- The four semantic accents ---- */
+  --synapse: #6fe3d2; /* recall              — 10.9:1 */
+  --ember: #f2a65a; /* consolidation       —  8.7:1 */
+  --signal: #e4586b; /* destruction         —  5.3:1 */
+  --umbra: #8b7fd4; /* doubt               —  5.1:1 */
+
+  /* Tinted fills for badges and surfaces. Alpha over --veil, so they stay
+   * legible on both surface levels. */
+  --synapse-fill: rgb(111 227 210 / 12%);
+  --ember-fill: rgb(242 166 90 / 12%);
+  --signal-fill: rgb(228 88 107 / 12%);
+  --umbra-fill: rgb(139 127 212 / 14%);
+
+  --synapse-edge: rgb(111 227 210 / 38%);
+  --ember-edge: rgb(242 166 90 / 38%);
+  --signal-edge: rgb(228 88 107 / 38%);
+  --umbra-edge: rgb(139 127 212 / 42%);
+
+  /* ---- Type ---- */
+  --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Albert Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Spline Sans Mono", ui-monospace, "SF Mono", monospace;
+
+  /* Mono is not decorative either: it marks machine-authored, verifiable
+   * values — IDs, hashes, SQL, region codes, ledger sequence numbers. If a
+   * human wrote it, it is not mono. */
+
+  --step--1: 0.833rem;
+  --step-0: 1rem;
+  --step-1: 1.25rem;
+  --step-2: 1.6rem;
+  --step-3: 2.15rem;
+  --step-4: 2.9rem;
+
+  --leading-tight: 1.15;
+  --leading-body: 1.55;
+  --tracking-display: -0.02em;
+
+  /* ---- Space, radius, motion ---- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+
+  --radius-sm: 4px;
+  --radius: 8px;
+  --radius-lg: 14px;
+
+  --ring: 0 0 0 2px var(--abyss), 0 0 0 4px var(--synapse);
+
+  --dur-fast: 120ms;
+  --dur: 220ms;
+  --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+/* The memory trace animates. Anyone who has asked not to see that, doesn't. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur: 0ms;
+  }
+}
+
+/* Mnemos is a dark product by design — "the engram at night". There is no light
+ * theme, and pretending otherwise with a half-tuned inversion would be worse
+ * than committing. Forced-colors mode is honoured instead, which is what users
+ * who need high contrast actually rely on. */
+@media (forced-colors: active) {
+  :root {
+    --hairline: CanvasText;
+  }
+}

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Mnemos">
+  <title>Mnemos</title>
+  <!-- Favicon variant: heavier strokes, larger nodes, no dash gap detail —
+       the dashed terminus is rendered as a single detached dot so the idea
+       survives at 16px, where a dash pattern turns to mud. -->
+  <rect width="64" height="64" rx="14" fill="#12172B" />
+  <g fill="none" stroke="#EDEFF7" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M15 48 V23" />
+    <path d="M15 23 L32 42" />
+    <path d="M32 42 L49 23" />
+    <path d="M49 23 V36" />
+  </g>
+  <circle cx="49" cy="47" r="3" fill="#EDEFF7" opacity="0.8" />
+  <g fill="#6FE3D2">
+    <circle cx="15" cy="23" r="5" />
+    <circle cx="32" cy="42" r="5" />
+    <circle cx="49" cy="23" r="5" />
+  </g>
+</svg>

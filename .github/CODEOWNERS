@@ -1,0 +1,13 @@
+# Default owner for everything.
+*                           @something1703
+
+# The invariants live in these paths. Changes here deserve a second look even
+# when the diff looks trivial — especially when the diff looks trivial.
+/packages/warden/           @something1703
+/services/warden/           @something1703
+/db/migrations/             @something1703
+/redteam/                   @something1703
+/Makefile                   @something1703
+/.github/workflows/         @something1703
+/docs/decisions.md          @something1703
+/docs/limits.md             @something1703

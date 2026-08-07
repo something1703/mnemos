@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 72" width="320" height="72" role="img" aria-label="Mnemos — Accountable Memory for Agents">
+  <title>Mnemos</title>
+  <desc>The Mnemos mark: an M built from three linked nodes, its final stroke dashed.</desc>
+  <!-- Font note: SVG embedded in Markdown cannot load webfonts, so the wordmark
+       falls back through a stack. For print and video assets, set the text in
+       Bricolage Grotesque and convert to outlines. See BRAND.md. -->
+  <g transform="translate(4 4)" fill="none" stroke="#EDEFF7" stroke-width="5"
+     stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 51 V21" />
+    <path d="M12 21 L32 43" />
+    <path d="M32 43 L52 21" />
+    <path d="M52 21 V37" />
+    <path d="M52 43 V51" stroke-dasharray="0.1 9" opacity="0.85" />
+  </g>
+  <g transform="translate(4 4)" fill="#6FE3D2">
+    <circle cx="12" cy="21" r="5.5" />
+    <circle cx="32" cy="43" r="5.5" />
+    <circle cx="52" cy="21" r="5.5" />
+  </g>
+  <text x="80" y="47"
+        font-family="Bricolage Grotesque, Albert Sans, ui-sans-serif, system-ui, sans-serif"
+        font-size="38" font-weight="700" letter-spacing="-0.5" fill="#EDEFF7">Mnemos</text>
+</svg>
