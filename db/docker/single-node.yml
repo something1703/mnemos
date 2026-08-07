@@ -1,0 +1,22 @@
+# Single-node CockroachDB for unit tests and local development.
+# Residency and node-kill work happens on the 9-node rig instead — see
+# multi-region.yml and `make db-multiregion`.
+#
+# Pin the version to match the Cloud cluster. Capability drift across 25.x is
+# real (see db/scripts/probe.py); running a different version locally than in
+# the cloud is how a team discovers a missing feature during the demo.
+
+services:
+  crdb:
+    image: cockroachdb/cockroach:v25.3.0
+    container_name: mnemos-crdb
+    command: start-single-node --insecure --store=type=mem,size=2GiB
+    ports:
+      - "26257:26257"   # SQL
+      - "8080:8080"     # DB Console
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health?ready=1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s

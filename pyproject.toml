@@ -1,0 +1,81 @@
+[project]
+name = "mnemos"
+version = "0.1.0"
+description = "Accountable memory for agents — governed, jurisdictional, provenance-complete, poison-resistant."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Apache-2.0" }
+
+[tool.uv.workspace]
+members = [
+    "packages/engine",
+    "packages/warden",
+    "services/api",
+    "services/sleep-cycle",
+    "services/custodian",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "hypothesis>=6.115",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "types-psycopg2",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["packages", "services", "db", "demos", "redteam", "bench"]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W",   # pycodestyle / pyflakes
+    "I",             # isort
+    "N",             # pep8-naming
+    "UP",            # pyupgrade
+    "B",             # bugbear
+    "A",             # builtins shadowing
+    "C4",            # comprehensions
+    "DTZ",           # naive datetimes — memory is timestamped; tz bugs are correctness bugs
+    "S",             # bandit security rules
+    "ASYNC",         # async gotchas
+    "RUF",
+]
+ignore = [
+    "S101",  # assert — used deliberately in tests and startup self-checks
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S", "DTZ"]
+"redteam/**" = ["S"]  # the attack suite is supposed to look like this
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+disallow_any_explicit = false
+# packages/ carries the invariants; it gets the strictest treatment.
+files = ["packages", "services", "db"]
+
+[[tool.mypy.overrides]]
+module = ["tests.*", "demos.*", "redteam.*", "bench.*"]
+strict = false
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["packages", "services", "tests", "redteam"]
+markers = [
+    "invariant: proves one of the five sacred invariants (see AGENTS.md)",
+    "cloud: requires a live CockroachDB Cloud cluster",
+    "rig: requires the 9-node multi-region rig (make db-multiregion)",
+    "aws: requires live AWS credentials",
+    "slow: excluded from the default PR run",
+]
+
+[tool.coverage.report]
+# packages/engine and packages/warden are held to 90% by CI; see Makefile.
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "raise NotImplementedError"]
