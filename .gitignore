@@ -1,0 +1,51 @@
+# ---- Secrets: never commit. Invariant-adjacent; gitleaks runs in CI. ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials
+secrets/
+*.tfvars
+!*.tfvars.example
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+dist/
+build/
+uv.lock.local
+
+# ---- Node / console ----
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+.pnpm-store/
+
+# ---- Infra / cloud ----
+.terraform/
+*.tfstate
+*.tfstate.*
+.aws-sam/
+cdk.out/
+
+# ---- Local data & scratch ----
+*.log
+cockroach-data/
+db/local-data/
+bench/results/*.raw
+.DS_Store
+.idea/
+.vscode/
+!.vscode/extensions.json
