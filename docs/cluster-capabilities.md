@@ -4,7 +4,7 @@
 > This file is the evidence behind ADR-006. Every capability below was
 > verified by executing real DDL against the live cluster, not read from docs.
 
-**Probed:** 2026-08-07 14:22 UTC
+**Probed:** 2026-08-07 14:57 UTC
 
 ## Cluster
 

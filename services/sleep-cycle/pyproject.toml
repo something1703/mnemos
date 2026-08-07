@@ -1,0 +1,26 @@
+[project]
+name = "mnemos-sleep-cycle"
+version = "0.1.0"
+description = "Consolidation, belief revision, trust promotion, decay. All AI work happens here, asynchronously, off the write path."
+requires-python = ">=3.12"
+license = { text = "Apache-2.0" }
+dependencies = [
+    "mnemos-engine",
+    "boto3>=1.35",
+    "pydantic>=2.9",
+]
+
+# This service invokes Bedrock, so it is untrusted by construction: everything
+# it writes lands at trust='unverified' and must be independently corroborated
+# before it becomes recallable (Phase 05.4). It holds no DELETE grant — decay
+# lowers strength, it never removes rows.
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mnemos_sleep_cycle"]
+
+[tool.uv.sources]
+mnemos-engine = { workspace = true }

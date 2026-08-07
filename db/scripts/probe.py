@@ -241,7 +241,7 @@ PROBES: tuple[Probe, ...] = (
 
 def _exec(cur: psycopg.Cursor, statements: Sequence[str]) -> None:
     for stmt in statements:
-        cur.execute(stmt)  # noqa: S608 - static probe SQL, no interpolation of user input
+        cur.execute(stmt)
 
 
 def run_probe(conn: psycopg.Connection, probe: Probe) -> Result:
@@ -263,7 +263,7 @@ def run_probe(conn: psycopg.Connection, probe: Probe) -> Result:
             raise _Rollback
     except _Rollback:
         return Result(probe, supported=True)
-    except Exception as exc:  # noqa: BLE001 - every failure mode is a finding
+    except Exception as exc:
         return Result(probe, supported=False, detail=_first_line(exc))
     finally:
         if job_id is not None:
@@ -271,10 +271,9 @@ def run_probe(conn: psycopg.Connection, probe: Probe) -> Result:
             # or cloud cluster that would kill someone else's changefeed.
             with contextlib.suppress(Exception), conn.cursor() as cur:
                 cur.execute("CANCEL JOB %s", (job_id,))
-    return Result(probe, supported=True)
 
 
-class _Rollback(Exception):
+class _Rollback(Exception):  # noqa: N818 - a control-flow sentinel, not an error
     """Sentinel: the probe succeeded, so undo whatever it created."""
 
 
@@ -302,7 +301,7 @@ def cluster_facts(conn: psycopg.Connection) -> dict[str, str]:
                 cur.execute(sql)
                 row = cur.fetchone()
                 facts[key] = " ".join(str(row[0]).split()) if row else "(empty)"
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             facts[key] = f"unavailable — {_first_line(exc)}"
 
     gc_seconds = _extract_gc_ttl(facts.get("default_gc_ttlseconds", ""))
@@ -321,7 +320,9 @@ def _extract_gc_ttl(config_sql: str) -> int | None:
 
 def render_report(facts: dict[str, str], results: list[Result]) -> str:
     now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
-    missing_critical = [r for r in results if not r.supported and r.probe.criticality is Criticality.CRITICAL]
+    missing_critical = [
+        r for r in results if not r.supported and r.probe.criticality is Criticality.CRITICAL
+    ]
     missing_important = [
         r for r in results if not r.supported and r.probe.criticality is Criticality.IMPORTANT
     ]
@@ -429,7 +430,7 @@ def main() -> int:
 
     try:
         conn = psycopg.connect(args.url, autocommit=True, connect_timeout=15)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return _fail(f"Could not connect: {_first_line(exc)}")
 
     with conn:
@@ -466,9 +467,7 @@ def main() -> int:
     blocked = [
         r
         for r in results
-        if not r.supported
-        and r.probe.criticality is Criticality.CRITICAL
-        and not r.probe.remedy
+        if not r.supported and r.probe.criticality is Criticality.CRITICAL and not r.probe.remedy
     ]
     if blocked:
         print("\nCRITICAL and unremediable:")
@@ -489,6 +488,6 @@ if __name__ == "__main__":
         raise SystemExit(main())
     except KeyboardInterrupt:
         raise SystemExit(130) from None
-    except Exception:  # noqa: BLE001 - probe failures must be legible, not a bare traceback
+    except Exception:
         traceback.print_exc()
         raise SystemExit(2) from None

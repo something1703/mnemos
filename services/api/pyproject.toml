@@ -1,0 +1,27 @@
+[project]
+name = "mnemos-api"
+version = "0.1.0"
+description = "Mnemos MCP server + REST facade. Validates admin operations, then hands them to the Warden across an IAM boundary."
+requires-python = ">=3.12"
+license = { text = "Apache-2.0" }
+dependencies = [
+    "mnemos-engine",
+    "fastapi>=0.115",
+    "uvicorn>=0.32",
+    "mcp>=1.1",
+    "pydantic>=2.9",
+]
+
+# Deliberately does NOT depend on mnemos-warden. The API validates forget/
+# revoke/hold requests and invokes the Warden Lambda; it never executes them
+# in-process. Its own execution role has no DELETE grant (Phase 04.1).
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mnemos_api"]
+
+[tool.uv.sources]
+mnemos-engine = { workspace = true }

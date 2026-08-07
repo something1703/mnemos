@@ -52,6 +52,11 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["S", "DTZ"]
 "redteam/**" = ["S"]  # the attack suite is supposed to look like this
+# The probe interpolates one module-level constant (SCRATCH_SCHEMA) into static
+# DDL. No user input reaches these strings. This exemption is scoped to the one
+# file that needs it rather than relaxed globally — S608 must keep firing
+# everywhere real queries are built.
+"db/scripts/probe.py" = ["S608"]
 
 [tool.mypy]
 python_version = "3.12"

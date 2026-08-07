@@ -52,17 +52,25 @@ invariants: ## Prove all five sacred invariants (~60s). Cited in the README.
 
 .PHONY: no-delete-in-engine
 no-delete-in-engine: ## Invariant 1, statically: the engine may not contain DELETE
-	@! grep -rniE '\b(DELETE[[:space:]]+FROM|DROP[[:space:]]+TABLE|TRUNCATE)\b' \
+	@# Each pattern requires a following SQL keyword so that prose describing this
+	@# guard does not trip it. A bare /TRUNCATE/ matched this rule's own docstring.
+	@! grep -rniE '\b(DELETE[[:space:]]+FROM|DROP[[:space:]]+(TABLE|SCHEMA|DATABASE)|TRUNCATE[[:space:]]+TABLE)\b' \
 		packages/engine services/api services/sleep-cycle services/custodian \
-		--include='*.py' --include='*.sql' \
+		--include='*.py' --include='*.sql' 2>/dev/null \
 		|| { echo "FAIL: destructive SQL outside packages/warden (invariant 1)"; exit 1; }
 	@echo "OK: no destructive SQL outside the Warden"
 
 .PHONY: no-model-in-warden
 no-model-in-warden: ## Invariant 1, statically: the Warden may not import an LLM client
-	@! grep -rniE '\b(bedrock|anthropic|openai|langchain|litellm|invoke_model)\b' \
-		packages/warden services/warden --include='*.py' \
-		|| { echo "FAIL: model dependency inside the Warden (invariant 1)"; exit 1; }
+	@# Match imports and client construction, NOT prose. The Warden's own docs
+	@# describe the bedrock:InvokeModel deny, and a naive keyword grep would flag
+	@# the documentation of the guarantee as a violation of it.
+	@! grep -rnE "^[[:space:]]*(import|from)[[:space:]]+(anthropic|openai|langchain|litellm|cohere|ollama|mistralai|google\.generativeai)" \
+		packages/warden services/warden --include='*.py' 2>/dev/null \
+		|| { echo "FAIL: LLM SDK imported inside the Warden (invariant 1)"; exit 1; }
+	@! grep -rnE "(client|resource)\([\"'][^\"']*bedrock" \
+		packages/warden services/warden --include='*.py' 2>/dev/null \
+		|| { echo "FAIL: Bedrock client constructed inside the Warden (invariant 1)"; exit 1; }
 	@echo "OK: no model dependency in the Warden"
 
 .PHONY: secrets
