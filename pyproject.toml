@@ -57,6 +57,10 @@ ignore = [
 # file that needs it rather than relaxed globally — S608 must keep firing
 # everywhere real queries are built.
 "db/scripts/probe.py" = ["S608"]
+# Error-suffix naming reads worse for these: `raise LegalHoldActive(...)` and
+# `except OutsideTemporalWindow` are sentences. Every one subclasses MnemosError,
+# so the suffix convention is satisfied at the root of the hierarchy.
+"packages/engine/src/mnemos_engine/errors.py" = ["N818"]
 
 [tool.mypy]
 python_version = "3.12"
