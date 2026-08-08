@@ -62,6 +62,8 @@ ignore = [
 # so the suffix convention is satisfied at the root of the hierarchy.
 "packages/engine/src/mnemos_engine/errors.py" = ["N818"]
 "packages/engine/src/mnemos_engine/crypto.py" = ["N818"]
+"packages/warden/src/mnemos_warden/errors.py" = ["N818"]
+"packages/warden/src/mnemos_warden/guarantees.py" = ["N818"]
 
 [tool.mypy]
 python_version = "3.12"

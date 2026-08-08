@@ -83,6 +83,18 @@ class MnemosEngine:
         """Where this process is running. Compared against a subject's home
         region so a write can never silently land in the wrong jurisdiction."""
 
+    @property
+    def envelope(self) -> Envelope:
+        """The encryption boundary this engine writes through.
+
+        Exposed so a caller composing a fact write outside of `remember` (the
+        sleep cycle in Phase 05; tests that seed facts directly today) uses
+        the SAME key custody the engine does, rather than constructing a
+        second envelope that happens to agree — which is exactly the
+        distinction a `shred` test needs to be meaningful.
+        """
+        return self._envelope
+
     # ------------------------------------------------------------------ write
 
     async def remember(

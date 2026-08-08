@@ -17,4 +17,30 @@ Every operation here requires an authenticated admin scope, an explicit confirm,
 a stored reason, and — where dual control is enabled — a second admin key.
 """
 
+from .errors import ConfirmationRequired, DualControlRequired, UnknownSubject
+from .keys import KeyProvider, KmsKeyProvider, LocalKeyProvider
+from .models import (
+    EraseMode,
+    ErasurePreview,
+    ErasureResult,
+    LegalHold,
+    RevocationRecord,
+)
+from .warden import Warden
+
 __version__ = "0.1.0"
+
+__all__ = [
+    "ConfirmationRequired",
+    "DualControlRequired",
+    "EraseMode",
+    "ErasurePreview",
+    "ErasureResult",
+    "KeyProvider",
+    "KmsKeyProvider",
+    "LegalHold",
+    "LocalKeyProvider",
+    "RevocationRecord",
+    "UnknownSubject",
+    "Warden",
+]
