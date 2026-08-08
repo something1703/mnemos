@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.scripts]
-mnemos-attest = "mnemos_warden.attestation.cli:main"
+mnemos-attest = "mnemos_warden.cli:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -224,3 +224,76 @@ arrangement the whole project argues against.
 there. Being explicit about the dev-time exception is more honest than quietly
 relying on the reader assuming otherwise — and the Phase 07 startup probe is
 what turns the claim into a test.
+
+---
+
+## ADR-013 — Real KMS keys and a real S3 Object Lock bucket, provisioned 2026-08-08
+
+**Context.** Phase 06.4 (crypto-shred) and 06.6 (ledger attestation) were
+built against interfaces only — `KmsKeyProvider` and the S3 anchoring path
+were `NotImplementedError` stubs, pending the explicit user approval AGENTS.md
+requires before creating a KMS key policy or a WORM bucket. The user approved
+both, with specific parameters: one CMK per demo tenant, and 7-day (not
+30-day) Object Lock retention.
+
+**Decision.**
+
+- **Three KMS CMKs**, one per demo tenant (`alias/mnemos-clinic`,
+  `alias/mnemos-ops`, `alias/mnemos-finance`), `us-east-1`, automatic annual
+  rotation enabled. Key policy grants the `mnemos` IAM user
+  `Encrypt`/`Decrypt`/`GenerateDataKey`/`DescribeKey` and, directly,
+  `ScheduleKeyDeletion`/`CancelKeyDeletion` — because no separate deployed
+  Warden execution role exists yet (that narrowing is Phase 04 deployment
+  infra's job; today, in dev, the Warden's process IS this IAM user).
+- **One S3 bucket** (`mnemos-ledger-anchor-582054875648`), Object Lock enabled
+  at creation (required — cannot be added after), default retention
+  **COMPLIANCE mode, 7 days**, versioning auto-enabled by Object Lock, all
+  public access blocked, SSE-S3 default encryption.
+- **Public access is blocked**, which deviates from PHASE_06.6's original
+  "public-readable for demo tenants" sketch. A private bucket is the safer
+  default — public S3 buckets are a leading real-world incident source, and a
+  Merkle root gains nothing from being world-readable by default.
+  `presign_anchor_url()` (`mnemos_warden.attestation`) generates a
+  time-limited link for sharing one specific anchor with a judge, without
+  granting them standing AWS credentials.
+
+**Verified, not assumed — WORM behaviour tested empirically before writing
+any code against it:**
+
+- A bare `DeleteObject` on a locked key does **not** error. S3 versioning
+  makes it create a *delete marker* — a new "current version" that hides the
+  object — while the actual locked version is untouched underneath.
+- `DeleteObject` targeting the **specific locked version ID** returns
+  `AccessDenied: Access Denied because object protected by object lock` —
+  even with `--bypass-governance-retention`, which only ever applies to
+  GOVERNANCE mode. COMPLIANCE mode has no bypass, for any principal,
+  including account root.
+- Removing the delete marker (itself unlocked) restores visibility of the
+  original object, unchanged.
+
+This distinction matters for `verify_against_anchor`: it always reads by
+`(tenant_id, checkpoint_seq)` key, which resolves to the current version. A
+delete-marker attack (hide, don't destroy) would make an anchor look
+*missing* rather than *wrong* — a different failure mode than tampering, and
+one `mnemos-attest verify` should be read as covering ("the anchor could not
+be found" vs. "the anchor disagrees with the live chain").
+
+**The claim this closes, proven end-to-end against real infrastructure
+(`tests/warden/test_attestation.py`, `make test-aws`):** an attacker with
+full database DML rights can rewrite a shard's entries **and**
+`chain_checkpoints.merkle_root` consistently — an internally-consistent
+forgery that fools `mnemos-verify`'s in-database check completely (proven:
+`verify_chain` reports `valid=True` against the forged state). The same
+forgery is caught by `mnemos-attest verify`, because the root committed to S3
+before the rewrite is outside that attacker's reach. This is the concrete
+difference between "tamper-evident within one checkpoint epoch" and
+"tamper-evident if nobody with database access is the adversary" — and it is
+why `docs/ledger.md` §5.3 exists.
+
+**Consequences.** `docs/limits.md`'s "tamper-evident, not tamper-proof"
+section is updated to state the anchored guarantee precisely rather than
+conditionally. The 7-day retention means these specific KMS keys and this
+specific bucket's contents survive at minimum through 2026-08-15 — safely
+past both the hackathon deadline and the judging window — and the bucket
+cannot be deleted or emptied before then even if the project is torn down
+early.

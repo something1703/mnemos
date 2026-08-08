@@ -70,24 +70,60 @@ invites.
 
 ## The ledger
 
-**Tamper-evident within one checkpoint epoch — not tamper-proof.**
+**Tamper-evident within one checkpoint epoch — not tamper-proof, and this is
+now proven against real infrastructure, not aspirational.**
 
-Hash chaining catches a single edited or deleted row immediately. It does *not*
-catch a principal who rewrites an entire shard and recomputes its internal
-hashes; that forgery is internally consistent. Such a rewrite is caught only
-when the shard's head is compared against a Merkle root already anchored in S3
-Object Lock, so the detection window is up to one checkpoint interval
-(default: 1 hour, configurable via `MNEMOS_CHECKPOINT_INTERVAL_MINUTES`).
+Hash chaining alone catches a single edited or deleted row immediately. It does
+*not* catch a principal with full database DML rights who rewrites an entire
+shard's entries **and** the `chain_checkpoints` row that describes it,
+consistently — that forgery is internally consistent, and we proved it: run
+`mnemos-verify` against such a forgery and it reports **VALID**
+(`tests/warden/test_attestation.py::test_attacker_who_fools_the_database_does_not_fool_the_anchor`,
+`make test-aws`).
 
-Shortening the epoch shortens the window and costs one checkpoint write per
-tenant per interval.
+What catches it is `mnemos-attest verify`, which compares the live chain
+against a Merkle root anchored to a real S3 bucket
+(`mnemos-ledger-anchor-582054875648`) with Object Lock in **COMPLIANCE mode,
+7-day retention** — created 2026-08-08, ADR-013. Objects there cannot be
+altered or deleted by anyone, including AWS account root, before
+2026-08-15. So the detection window for a whole-shard-plus-checkpoint forgery
+is bounded by how often `mnemos-attest anchor` runs (a manual/scheduled step;
+not yet on an EventBridge schedule — that lands with Phase 05's scheduling
+infra), not by the in-database checkpoint interval alone.
+
+**Empirically verified WORM behaviour, precisely stated:** a bare
+`DeleteObject` on a locked object does not error — S3 versioning turns it into
+a *delete marker* that hides the object while the locked version underneath is
+untouched. `DeleteObject` against the specific locked version ID returns
+`AccessDenied`, even with `--bypass-governance-retention` (which only applies
+to GOVERNANCE mode; COMPLIANCE mode has no bypass for any principal). This
+means a delete-marker attack against an anchor manifests as "anchor not found"
+in `mnemos-attest verify`, not as "anchor disagrees" — a different failure
+signature worth knowing before reading a NoSuchKey error as anything other
+than an attack attempt or an operational mistake.
 
 **A DDL-capable principal can remove the enforcement.** Invariant 2 is enforced
 by a database trigger. Someone with `DROP TRIGGER` rights can remove it and then
 write unaudited rows. Application roles are denied this (tested in
 `tests/invariants/test_invariant_1_privileges.py`), but a database owner is not.
-The anchored checkpoints are the defense: the chain notices the gap even when
-the trigger is gone.
+Anchored checkpoints are the defense against the *consequence* of that (a
+rewrite that goes undetected); they do not prevent the trigger from being
+dropped in the first place, only make the resulting gap provable after the fact.
+
+**Not yet true, stated plainly:** anchoring does not yet run on a schedule —
+today it is `mnemos-attest anchor`, invoked manually or from CI. A tenant that
+is never re-anchored after new writes has no anchor covering that new state,
+and `mnemos-attest verify` only proves what it was last asked to anchor.
+Scheduled anchoring (EventBridge, alongside the checkpoint interval) is Phase
+05/11 work, not yet built.
+
+**KMS keys, similarly.** `KmsKeyProvider.destroy()` (real `shred`, Phase 06.4)
+calls AWS's `ScheduleKeyDeletion` with the required minimum 7-day pending
+window — genuinely slower than `LocalKeyProvider`'s instantaneous destruction,
+and deliberately not worked around. `is_destroyed()` means "deletion has been
+scheduled and the key can no longer be used", not "the key material is
+already gone" — those are different instants, 7 days apart, and both matter
+depending on which claim you are checking.
 
 ---
 

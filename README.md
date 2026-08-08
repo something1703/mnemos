@@ -157,11 +157,21 @@ Three verticals run as three tenants on one fabric —
 The full version is [docs/limits.md](docs/limits.md). The short version:
 
 - The hash chain proves a deletion was **recorded and unmodified** — not that
-  every byte is gone. `shred` mode destroys the tenant's KMS key so
-  backup- and MVCC-resident ciphertext becomes unreadable; that is the mode
-  that closes the gap, and we test it against a real restored backup.
-- Ledger tampering is detectable **within one checkpoint epoch**, not
-  instantly. We publish the epoch and the analysis.
+  every byte is gone. `shred` mode destroys the tenant's real AWS KMS key
+  (three per-tenant CMKs, provisioned 2026-08-08) so backup- and
+  MVCC-resident ciphertext becomes unreadable; that is the mode that closes
+  the gap. Tested against real KMS; **not yet** against a real restored
+  backup — that drill is Phase 11, not done.
+- Ledger tampering by an attacker with database DML rights — including one
+  who rewrites both the audit chain **and** the checkpoint row that describes
+  it, consistently — is caught by comparing the live chain against a Merkle
+  root anchored to a real S3 bucket with Object Lock (COMPLIANCE mode, 7-day
+  retention). Proven, not asserted: our own in-database verifier
+  (`mnemos-verify`) reports such a forgery as VALID; the anchor-backed one
+  (`mnemos-attest verify`) does not
+  (`tests/warden/test_attestation.py`, `make test-aws`). Detection is bounded
+  by how often a checkpoint is anchored, not yet on a schedule — see
+  [docs/limits.md](docs/limits.md).
 - Embeddings are a lossy but non-zero leak of their source text. This is
   exactly why erasure must delete vectors in the same transaction.
 - `AS OF SYSTEM TIME` recall is bounded by `gc.ttlseconds`. Subjects under
@@ -215,6 +225,7 @@ demos/                 continuity · contagion · deposition · resilience
 redteam/               six attack classes, run in CI
 bench/                 shard scaling, vector scaling, blast-radius scaling
 db/                    migrations, seed, verifier, attestation
+scripts/               independent_verify.py — the judge-facing, dependency-free ledger check
 infra/                 IaC per service + observability dashboards
 brand/                 tokens, logo, BRAND.md
 docs/                  architecture, decisions, security, threat model, limits, redteam, scale, runbook

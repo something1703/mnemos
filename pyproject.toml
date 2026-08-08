@@ -24,12 +24,13 @@ dev = [
     "ruff>=0.8",
     "mypy>=1.13",
     "types-psycopg2",
+    "boto3-stubs[kms,s3]>=1.35",
 ]
 
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-src = ["packages", "services", "db", "demos", "redteam", "bench"]
+src = ["packages", "services", "db", "demos", "redteam", "bench", "scripts"]
 
 [tool.ruff.lint]
 select = [
@@ -64,6 +65,7 @@ ignore = [
 "packages/engine/src/mnemos_engine/crypto.py" = ["N818"]
 "packages/warden/src/mnemos_warden/errors.py" = ["N818"]
 "packages/warden/src/mnemos_warden/guarantees.py" = ["N818"]
+"packages/warden/src/mnemos_warden/attestation.py" = ["N818"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -71,7 +73,7 @@ strict = true
 warn_unreachable = true
 disallow_any_explicit = false
 # packages/ carries the invariants; it gets the strictest treatment.
-files = ["packages", "services", "db"]
+files = ["packages", "services", "db", "scripts"]
 
 [[tool.mypy.overrides]]
 module = ["tests.*", "demos.*", "redteam.*", "bench.*"]

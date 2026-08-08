@@ -3,7 +3,7 @@
 Inventory only. **No credential values ever appear in this file** — secrets live
 in local `.env` (gitignored) and AWS Secrets Manager.
 
-Last verified: 2026-08-07.
+Last verified: 2026-08-08.
 
 ## GitHub
 
@@ -49,13 +49,41 @@ a service-account key.
 Roles created per phase are documented with their grants **and their explicit
 denies** in [security.md](security.md).
 
+### KMS (ADR-013, provisioned 2026-08-08)
+
+| Tenant | Alias | Key ARN | Rotation |
+|---|---|---|---|
+| clinic | `alias/mnemos-clinic` | `arn:...:key/e13f8b64-7407-46ea-b02f-062f1d77f8e6` | annual, on |
+| ops | `alias/mnemos-ops` | `arn:...:key/688aaeda-b4f0-4a86-823d-f5b3ad3981d2` | annual, on |
+| finance | `alias/mnemos-finance` | `arn:...:key/fd472753-f7ff-4456-b8b0-faf54fc21210` | annual, on |
+
+Full ARNs in local `.env` (`MNEMOS_KMS_KEY_ARN_*`), never committed. Key
+policy grants the `mnemos` IAM user usage and `ScheduleKeyDeletion` directly —
+no separate Warden execution role is deployed yet; see ADR-013.
+
+### S3 (ADR-013, provisioned 2026-08-08)
+
+| Item | Value |
+|---|---|
+| Bucket | `mnemos-ledger-anchor-582054875648` |
+| Purpose | Merkle-root checkpoint anchoring (ledger attestation) |
+| Object Lock | Enabled at creation, **COMPLIANCE mode, 7-day retention** |
+| Retained through | ≥ 2026-08-15 (past the hackathon deadline and judging window) |
+| Public access | Blocked (all four settings) — deviates from the original "public-readable" phase sketch; see ADR-013 for why |
+| Encryption | SSE-S3 default |
+| Versioning | Enabled (required by, and auto-enabled with, Object Lock) |
+
+**This bucket cannot be emptied or deleted before 2026-08-15**, even by
+account root, even if the project is torn down early. Confirmed empirically
+before any code was written against it (ADR-013).
+
 ## Still to provision
 
 - [ ] Bedrock model access — Claude + `amazon.titan-embed-text-v2:0` (Phase 05)
-- [ ] KMS customer-managed key per tenant (Phase 02.4)
-- [ ] S3 Object Lock bucket, compliance mode — **requires explicit user
-      approval before creation; objects cannot be deleted until retention
-      expires** (Phase 06.6)
+- [ ] Scheduled anchoring (EventBridge) — today `mnemos-attest anchor` is
+      manual; see docs/limits.md
+- [ ] Dedicated Warden execution role — would narrow the KMS key policy's
+      `ScheduleKeyDeletion` grant off the `mnemos` IAM user (Phase 04 deploy)
 - [ ] CockroachDB Cloud service account, read-only (Phase 07)
 - [ ] Cockroach Labs community Slack
 - [ ] Devpost registration
