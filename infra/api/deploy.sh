@@ -146,9 +146,12 @@ fi
 aws lambda wait function-updated --function-name "$FUNCTION" --region "$REGION"
 
 # --- public edge ------------------------------------------------------------
-# API Gateway rather than a Lambda Function URL: this account denies anonymous
-# lambda:InvokeFunctionUrl regardless of the function's resource policy, so a
-# Function URL answers 403 to everyone.
+# API Gateway rather than a Lambda Function URL. A Function URL was tried first
+# and returned AccessDeniedException to every caller despite auth-type NONE and
+# a resource policy allowing Principal "*" with the FunctionUrlAuthType
+# condition — so something above the function (an SCP or account-level control)
+# denies anonymous lambda:InvokeFunctionUrl here. The exact control was not
+# identified; the gateway sidesteps it and is a better public edge anyway.
 API_ID="$(aws apigatewayv2 get-apis --region "$REGION" \
   --query "Items[?Name=='${FUNCTION}'].ApiId | [0]" --output text)"
 if [[ "$API_ID" == "None" || -z "$API_ID" ]]; then

@@ -1,7 +1,15 @@
 # Deployment — the Mnemos API on AWS Lambda
 
-The function is a container image (`Dockerfile`, arm64/Graviton) exposed through a
-Lambda Function URL. `make deploy-api` builds, pushes and updates it.
+The function is a container image (`Dockerfile`, arm64/Graviton) exposed through an
+API Gateway HTTP API. `make deploy-api` builds, pushes and updates it; it is
+idempotent, so it also provisions a fresh account from nothing.
+
+A Lambda Function URL was the first choice and did not work here: with
+`--auth-type NONE` and a resource policy allowing `Principal: "*"` under the
+`lambda:FunctionUrlAuthType` condition, every request still came back
+`AccessDeniedException`. Something above the function denies anonymous
+`lambda:InvokeFunctionUrl` in this account; the control was not identified. The
+gateway avoids the question and gives better CORS and logging besides.
 
 ## What the execution role deliberately cannot do
 
