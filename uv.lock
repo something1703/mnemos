@@ -776,6 +776,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "mcp" },
     { name = "mnemos-engine" },
+    { name = "mnemos-warden" },
     { name = "pydantic" },
     { name = "uvicorn" },
 ]
@@ -783,8 +784,9 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
-    { name = "mcp", specifier = ">=1.1" },
+    { name = "mcp", specifier = ">=2.0" },
     { name = "mnemos-engine", editable = "packages/engine" },
+    { name = "mnemos-warden", editable = "packages/warden" },
     { name = "pydantic", specifier = ">=2.9" },
     { name = "uvicorn", specifier = ">=0.32" },
 ]

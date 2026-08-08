@@ -4,17 +4,32 @@ version = "0.1.0"
 description = "Mnemos MCP server + REST facade. Validates admin operations, then hands them to the Warden across an IAM boundary."
 requires-python = ">=3.12"
 license = { text = "Apache-2.0" }
+# On depending on mnemos-warden (this was NOT the original plan — see below).
+#
+# PHASE_04 sketched an API that never imports the Warden and instead invokes it
+# as a separate Lambda across an IAM boundary. That remains the deployment
+# target (Phase 04.4), and it is the stronger form.
+#
+# In-process today, the separation is enforced at the DATABASE layer instead:
+# the API's own pool connects as a role with no DELETE grant anywhere
+# (mnemos_api, migration 011), and Warden operations use a second pool bound to
+# a privileged role. An admin scope check gates the second pool before it is
+# ever touched. If both DSNs are identical the separation is inactive, and the
+# service says so at startup and in memory_stats rather than pretending.
+#
+# Recording this here because a comment claiming "does NOT depend on
+# mnemos-warden" while runtime.py imports it would be worse than the coupling.
 dependencies = [
     "mnemos-engine",
+    "mnemos-warden",
     "fastapi>=0.115",
     "uvicorn>=0.32",
-    "mcp>=1.1",
+    "mcp>=2.0",
     "pydantic>=2.9",
 ]
 
-# Deliberately does NOT depend on mnemos-warden. The API validates forget/
-# revoke/hold requests and invokes the Warden Lambda; it never executes them
-# in-process. Its own execution role has no DELETE grant (Phase 04.1).
+[project.scripts]
+mnemos-api = "mnemos_api.cli:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -25,3 +40,4 @@ packages = ["src/mnemos_api"]
 
 [tool.uv.sources]
 mnemos-engine = { workspace = true }
+mnemos-warden = { workspace = true }

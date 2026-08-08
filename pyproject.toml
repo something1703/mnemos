@@ -79,6 +79,14 @@ files = ["packages", "services", "db", "scripts"]
 module = ["tests.*", "demos.*", "redteam.*", "bench.*"]
 strict = false
 
+# The MCP SDK's @server.tool() decorator is untyped, so mypy treats every tool
+# it wraps as untyped too. That is a third-party typing gap, not a gap in our
+# code — the tool bodies themselves are fully annotated and still checked.
+# Scoped to this one module so the rule keeps biting everywhere else.
+[[tool.mypy.overrides]]
+module = ["mnemos_api.tools"]
+disable_error_code = ["untyped-decorator"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["packages", "services", "tests", "redteam"]
