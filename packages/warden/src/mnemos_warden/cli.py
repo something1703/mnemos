@@ -15,12 +15,15 @@ import argparse
 import asyncio
 import os
 import sys
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import boto3
 import psycopg
 from mnemos_engine.db import Database
-from mypy_boto3_s3 import S3Client
+
+if TYPE_CHECKING:  # boto3-stubs is dev-only — see keys.py
+    from mypy_boto3_s3 import S3Client
 
 from .attestation import (
     AttestationMismatch,

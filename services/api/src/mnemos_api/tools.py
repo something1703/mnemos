@@ -478,7 +478,7 @@ def register_tools(server: Any, runtime: Runtime) -> None:
         stats = await runtime.db.transaction(
             principal.tenant_id, run, label="memory_stats", read_only=True
         )
-        stats["posture"] = runtime.settings.describe_posture()
+        stats["posture"] = runtime.describe_posture()
         return stats
 
     @server.tool(

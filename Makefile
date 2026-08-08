@@ -164,3 +164,18 @@ redteam: ## Full six-class attack suite against our own stack
 .PHONY: redteam-ci
 redteam-ci: ## The regression subset that runs on every PR
 	uv run pytest redteam/ -m "not slow and not aws" -v
+
+# ---------------------------------------------------------------------------
+# Deployment (Phase 04.4)
+# ---------------------------------------------------------------------------
+.PHONY: deploy-api
+deploy-api: ## Build arm64 image, push to ECR, update Lambda, smoke test posture
+	bash infra/api/deploy.sh
+
+.PHONY: deploy-api-fast
+deploy-api-fast: ## Redeploy config + smoke test without rebuilding the image
+	SKIP_BUILD=1 bash infra/api/deploy.sh
+
+.PHONY: logs-api
+logs-api: ## Tail the deployed API's CloudWatch logs
+	aws logs tail /aws/lambda/mnemos-api --follow --format short

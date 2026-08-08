@@ -20,13 +20,19 @@ from __future__ import annotations
 
 import os
 import threading
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 from uuid import UUID
 
 import boto3
 from botocore.exceptions import ClientError
 from mnemos_engine.crypto import DecryptionFailed, DestroyedKeyWrapper, KeyWrapper, LocalKeyWrapper
-from mypy_boto3_kms import KMSClient
+
+if TYPE_CHECKING:
+    # boto3-stubs is a dev dependency and is not installed in the deployed
+    # image. Importing it unconditionally turned a type annotation into a
+    # runtime import that only failed in production — caught by running the
+    # Lambda image, not by any test, since the test venv has the dev group.
+    from mypy_boto3_kms import KMSClient
 
 
 class KeyProvider(Protocol):

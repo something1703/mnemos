@@ -26,7 +26,7 @@ from starlette.types import ASGIApp
 
 from .rest import build_rest_app
 from .runtime import Runtime
-from .server import build_server, with_auth
+from .server import build_server, transport_security_for, with_auth, with_slash_alias
 
 log = logging.getLogger("mnemos.api.app")
 
@@ -37,6 +37,7 @@ def build_app(runtime: Runtime, *, stateless: bool = False) -> ASGIApp:
         streamable_http_path="/",
         stateless_http=stateless,
         json_response=stateless,
+        transport_security=transport_security_for(runtime.settings),
     )
 
     # Auth wraps only the MCP mount; REST authenticates per-route through a
@@ -55,4 +56,4 @@ def build_app(runtime: Runtime, *, stateless: bool = False) -> ASGIApp:
     )
     app.state.runtime = runtime
     log.info("app: /mcp (MCP, stateless=%s) + /v1 (REST, read-only)", stateless)
-    return app
+    return with_slash_alias(app, "/mcp")

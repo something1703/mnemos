@@ -84,7 +84,7 @@ def build_rest_app(runtime: Runtime) -> FastAPI:
         return {
             "status": "ok" if database == "ok" else "degraded",
             "database": database,
-            "posture": runtime.settings.describe_posture(),
+            "posture": runtime.describe_posture(),
         }
 
     @app.get("/v1/stats", tags=["memory"])
@@ -124,7 +124,7 @@ def build_rest_app(runtime: Runtime) -> FastAPI:
         result = await runtime.db.transaction(
             principal.tenant_id, run, label="rest_stats", read_only=True
         )
-        result["posture"] = runtime.settings.describe_posture()
+        result["posture"] = runtime.describe_posture()
         return result
 
     @app.get("/v1/facts", tags=["memory"])

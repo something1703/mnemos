@@ -14,11 +14,13 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator, Callable
 
+import psycopg
 import pytest
 from mnemos_api.config import Settings
 from mnemos_api.context import clear_principal, set_principal
 from mnemos_api.keys import Principal, Scope, mint_key
 from mnemos_api.runtime import Runtime, build_runtime
+from psycopg_pool import PoolTimeout
 
 LOCAL_DSN = "postgresql://root@localhost:26257/mnemos?sslmode=disable"
 
@@ -38,6 +40,8 @@ def _settings(**overrides: object) -> Settings:
         "chain_shards": 16,
         "host": "127.0.0.1",
         "port": 8000,
+        "db_pool_max": 4,
+        "allowed_hosts": ("127.0.0.1:*", "localhost:*", "testserver"),
     }
     base.update(overrides)
     return Settings(**base)  # type: ignore[arg-type]
@@ -45,9 +49,13 @@ def _settings(**overrides: object) -> Settings:
 
 @pytest.fixture
 async def runtime() -> AsyncIterator[Runtime]:
+    # Only a connection failure means "no database". Catching everything here
+    # once turned a TypeError from a new required Settings field into 34 tests
+    # reporting "local CockroachDB unavailable" and passing the run green — a
+    # skip that lies is worse than a failure, because nobody investigates it.
     try:
         rt = await build_runtime(_settings())
-    except Exception as exc:
+    except (psycopg.OperationalError, PoolTimeout) as exc:
         pytest.skip(f"local CockroachDB unavailable ({exc}). Run: make db-local")
     yield rt
     await rt.close()

@@ -1,0 +1,39 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadOwnConfigSecret",
+      "Effect": "Allow",
+      "Action": "secretsmanager:GetSecretValue",
+      "Resource": "arn:aws:secretsmanager:us-east-1:582054875648:secret:mnemos/api-*"
+    },
+    {
+      "Sid": "EnvelopeEncryptionPerTenantCmk",
+      "Effect": "Allow",
+      "Action": [
+        "kms:Encrypt",
+        "kms:Decrypt",
+        "kms:GenerateDataKey",
+        "kms:DescribeKey"
+      ],
+      "Resource": [
+        "arn:aws:kms:us-east-1:582054875648:key/e13f8b64-7407-46ea-b02f-062f1d77f8e6",
+        "arn:aws:kms:us-east-1:582054875648:key/688aaeda-b4f0-4a86-823d-f5b3ad3981d2",
+        "arn:aws:kms:us-east-1:582054875648:key/fd472753-f7ff-4456-b8b0-faf54fc21210"
+      ]
+    },
+    {
+      "Sid": "ReadLedgerAnchorsOnly",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:GetObjectRetention",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::mnemos-ledger-anchor-582054875648",
+        "arn:aws:s3:::mnemos-ledger-anchor-582054875648/*"
+      ]
+    }
+  ]
+}

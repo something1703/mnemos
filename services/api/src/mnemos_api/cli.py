@@ -70,7 +70,7 @@ async def _cmd_mint(tenant: str, scope_raw: str, label: str) -> int:
 async def _cmd_posture() -> int:
     runtime = await build_runtime()
     try:
-        posture = runtime.settings.describe_posture()
+        posture = runtime.describe_posture()
     finally:
         await runtime.close()
 

@@ -16,9 +16,11 @@ import json
 import logging
 
 from mcp.server import MCPServer
+from mcp.server.transport_security import TransportSecuritySettings
 from starlette.datastructures import Headers
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from .config import Settings
 from .context import reset_principal, set_principal
 from .keys import AuthError, resolve_key, touch_key
 from .runtime import Runtime
@@ -108,8 +110,57 @@ class AuthMiddleware:
             reset_principal(marker)
 
 
+def transport_security_for(settings: Settings) -> TransportSecuritySettings:
+    """DNS rebinding protection, configured rather than switched off.
+
+    The SDK's default allow-list is loopback only, so a deployed server answers
+    every MCP request with 421 "Invalid Host header" until its own hostname is
+    named. That is the right default and the wrong thing to fix by disabling
+    the middleware: the check costs nothing and closes a real attack on any
+    developer running this locally.
+
+    Origins are left unrestricted. Authorisation here is a bearer token that a
+    browser will not attach on its own, so an Origin allow-list would add
+    ceremony without adding a control.
+    """
+    allowed = list(settings.allowed_hosts)
+    if "*" in allowed:
+        log.warning(
+            "MNEMOS_ALLOWED_HOSTS contains '*': DNS rebinding protection is DISABLED "
+            "for the MCP transport."
+        )
+        return TransportSecuritySettings(enable_dns_rebinding_protection=False)
+    return TransportSecuritySettings(enable_dns_rebinding_protection=True, allowed_hosts=allowed)
+
+
 def with_auth(app: ASGIApp, runtime: Runtime) -> ASGIApp:
     return AuthMiddleware(app, runtime)
+
+
+def with_slash_alias(app: ASGIApp, prefix: str) -> ASGIApp:
+    """Make a bare ``/mcp`` behave as ``/mcp/``.
+
+    Starlette's Mount only matches the prefix followed by a slash, so a bare
+    ``POST /mcp`` falls past the MCP mount to the REST app and returns a plain
+    404 with no hint that a trailing slash was the problem. Every client config
+    anyone will paste says ``.../mcp``, so the bare form has to work.
+
+    This wraps the whole app rather than the mounted one: by the time the
+    router is choosing between mounts it has already declined ``/mcp``, so the
+    rewrite has to happen before routing.
+
+    A redirect would also work, but 307 costs a second Lambda invocation per
+    request and not every MCP client re-sends the body on redirect. Rewriting
+    the path is one dictionary assignment and has neither problem.
+    """
+    target = prefix + "/"
+
+    async def normalised(scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http" and scope.get("path") == prefix:
+            scope = {**scope, "path": target, "raw_path": target.encode()}
+        await app(scope, receive, send)
+
+    return normalised
 
 
 async def _reject(send: Send, status: int, message: str) -> None:

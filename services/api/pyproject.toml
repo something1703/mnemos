@@ -26,6 +26,8 @@ dependencies = [
     "uvicorn>=0.32",
     "mcp>=2.0",
     "pydantic>=2.9",
+    # Lambda adapter. Pure Python, so nothing extra to install into the image.
+    "mangum>=0.19",
 ]
 
 [project.scripts]

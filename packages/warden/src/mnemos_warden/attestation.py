@@ -28,12 +28,14 @@ from __future__ import annotations
 import json
 import logging
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import psycopg
 from mnemos_engine.canonical import merkle_root
-from mypy_boto3_s3 import S3Client
+
+if TYPE_CHECKING:  # boto3-stubs is dev-only — see keys.py
+    from mypy_boto3_s3 import S3Client
 
 from .errors import UnknownSubject
 
