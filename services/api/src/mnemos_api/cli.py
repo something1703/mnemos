@@ -89,16 +89,14 @@ async def _cmd_posture() -> int:
     return EXIT_OK
 
 
-async def _cmd_serve() -> int:
+async def _cmd_serve(stateless: bool) -> int:
     import uvicorn
 
-    from .server import build_server, with_auth
+    from .app import build_app
 
     settings = get_settings()
     runtime = await build_runtime(settings)
-    server = build_server(runtime)
-
-    app = with_auth(server.streamable_http_app(streamable_http_path="/mcp"), runtime)
+    app = build_app(runtime, stateless=stateless)
 
     config = uvicorn.Config(
         app,
@@ -106,7 +104,11 @@ async def _cmd_serve() -> int:
         port=settings.port,
         log_level="info",
     )
-    print(f"MCP endpoint: http://{settings.host}:{settings.port}/mcp")
+    base = f"http://{settings.host}:{settings.port}"
+    print(f"  MCP   {base}/mcp")
+    print(f"  REST  {base}/v1/stats")
+    print(f"  docs  {base}/docs")
+    print(f"  health {base}/health")
     try:
         await uvicorn.Server(config).serve()
     finally:
@@ -125,7 +127,13 @@ def main() -> int:
     mint.add_argument("--label", required=True, help="what this key is for")
 
     sub.add_parser("posture", help="show the configured security posture")
-    sub.add_parser("serve", help="run the MCP server")
+
+    serve = sub.add_parser("serve", help="run the MCP + REST server")
+    serve.add_argument(
+        "--stateless",
+        action="store_true",
+        help="self-contained requests with buffered JSON responses; required on Lambda",
+    )
 
     args = parser.parse_args()
 
@@ -134,7 +142,7 @@ def main() -> int:
             return asyncio.run(_cmd_mint(args.tenant, args.scope, args.label))
         if args.command == "posture":
             return asyncio.run(_cmd_posture())
-        return asyncio.run(_cmd_serve())
+        return asyncio.run(_cmd_serve(getattr(args, "stateless", False)))
     except KeyboardInterrupt:
         return 130
     except RuntimeError as exc:

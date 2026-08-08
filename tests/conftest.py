@@ -14,6 +14,9 @@ from collections.abc import Iterator
 
 import psycopg
 import pytest
+from mnemos_engine.canonical import GENESIS_HASH, entry_hash, payload_hash
+from mnemos_engine.canonical import shard_for as canonical_shard_for
+from psycopg.types.json import Json
 
 LOCAL_URL = "postgresql://root@localhost:26257/mnemos?sslmode=disable"
 
@@ -104,37 +107,91 @@ def append_audit(
     *,
     op: str = "remember",
     subject_key: str = "subject:test",
-    shard_id: int = 0,
+    shard_id: int | None = None,
 ) -> uuid.UUID:
-    """Write a real audit row and arm its ticket for the current transaction.
+    """Write a real, VERIFIABLE audit row and arm its ticket.
 
-    This mirrors what ``mnemos_engine.append_audit`` will do in Phase 03: insert
-    into the chain, then ``SET LOCAL app.audit_ticket`` so the trigger on the
-    protected tables can resolve it. Callers must already be inside a
-    transaction — that is the point.
+    Byte-identical to ``mnemos_engine.ledger.append_audit``: canonical payload
+    hashing, prev_hash chaining, and chain_heads maintenance. Callers must
+    already be inside a transaction — that is the point.
+
+    An earlier version wrote ``payload='{}'`` with placeholder hashes, which
+    was invisible to the invariant tests (they assert that BAD writes are
+    rejected, not that hashes recompute) but silently corrupted the chain of
+    any tenant a test touched. It was caught only when a test that bulk-loads
+    into the seeded `clinic` tenant left that tenant's ledger reporting BROKEN
+    through the REST verifier — i.e. by a demo surface, not by a test.
+
+    The lesson is the same one db/seed.py already learned: anything that
+    appends to the chain must produce entries that verify, or it is not
+    exercising the system, it is damaging it.
     """
     ticket = uuid.uuid4()
+    shard = shard_id if shard_id is not None else canonical_shard_for(subject_key, 16)
+
     # Every real caller sets the tenant context; RLS (FORCE) blocks the audit
     # insert otherwise for any role without BYPASSRLS. root bypasses RLS, so
     # omitting this would pass as admin and fail as the Warden — exactly the
     # kind of divergence that hides a bug until deployment.
     cur.execute(f"SET LOCAL app.tenant_id = '{tenant_id}'")
+
     cur.execute(
-        "SELECT COALESCE(MAX(seq), 0) + 1 FROM mnemos.audit_chain "
-        "WHERE tenant_id = %s AND shard_id = %s",
-        (tenant_id, shard_id),
+        "SELECT seq, entry_hash FROM mnemos.chain_heads "
+        "WHERE tenant_id = %s AND shard_id = %s FOR UPDATE",
+        (tenant_id, shard),
     )
-    row = cur.fetchone()
-    seq = row[0] if row else 1
+    head = cur.fetchone()
+    if head is None:
+        # Tolerate a chain written before chain_heads existed, the same way
+        # db/seed.py does: repair rather than collide with a duplicate seq.
+        cur.execute(
+            "SELECT COALESCE(MAX(seq), 0) FROM mnemos.audit_chain "
+            "WHERE tenant_id = %s AND shard_id = %s",
+            (tenant_id, shard),
+        )
+        orphan = cur.fetchone()
+        prev_seq, prev_hash = (int(orphan[0]) if orphan else 0), GENESIS_HASH
+    else:
+        prev_seq, prev_hash = int(head[0]), bytes(head[1])
+
+    seq = prev_seq + 1
+    body = {
+        "op": op,
+        "actor": "test",
+        "subject_key": subject_key,
+        "reason": None,
+        "seq": seq,
+        "shard_id": shard,
+        "tenant_id": str(tenant_id),
+        "data": {},
+    }
+    digest = payload_hash(body)
+    entry = entry_hash(digest, prev_hash)
+
     cur.execute(
         """
         INSERT INTO mnemos.audit_chain
-            (tenant_id, shard_id, seq, ticket, op, subject_key, actor,
+            (tenant_id, shard_id, seq, ticket, op, subject_key, actor, reason,
              payload, payload_hash, prev_hash, entry_hash)
-        VALUES (%s, %s, %s, %s, %s, %s, 'test', '{}'::JSONB, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, 'test', NULL, %s, %s, %s, %s)
         """,
-        (tenant_id, shard_id, seq, ticket, op, subject_key, b"\x00", b"\x00", b"\x00"),
+        (tenant_id, shard, seq, ticket, op, subject_key, Json(body), digest, prev_hash, entry),
     )
+
+    if head is None:
+        cur.execute(
+            "INSERT INTO mnemos.chain_heads (tenant_id, shard_id, seq, entry_hash) "
+            "VALUES (%s, %s, %s, %s) "
+            "ON CONFLICT (tenant_id, shard_id) DO UPDATE SET seq = %s, entry_hash = %s",
+            (tenant_id, shard, seq, entry, seq, entry),
+        )
+    else:
+        cur.execute(
+            "UPDATE mnemos.chain_heads SET seq = %s, entry_hash = %s, updated_at = now() "
+            "WHERE tenant_id = %s AND shard_id = %s",
+            (seq, entry, tenant_id, shard),
+        )
+
     cur.execute(f"SET LOCAL app.audit_ticket = '{ticket}'")
     return ticket
 
