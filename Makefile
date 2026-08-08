@@ -179,3 +179,7 @@ deploy-api-fast: ## Redeploy config + smoke test without rebuilding the image
 .PHONY: logs-api
 logs-api: ## Tail the deployed API's CloudWatch logs
 	aws logs tail /aws/lambda/mnemos-api --follow --format short
+
+.PHONY: smoke
+smoke: ## Prove a deployment works AND that its guarantees hold (exit != 0 on failure)
+	uv run python examples/clients/smoke.py

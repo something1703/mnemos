@@ -119,17 +119,47 @@ make demo-continuity  # cross-border clinic: recall, residency, erasure, hold
 Want the residency and node-kill story? `make db-multiregion` brings up a
 9-node local cluster across three simulated localities.
 
-Connect your own agent (Claude Code shown; Cursor and LangGraph snippets in
-[docs/clients.md](docs/clients.md)):
+### Talk to the deployed instance
 
-```json
-{ "mcpServers": { "mnemos": {
-    "url": "https://<api-endpoint>/mcp",
-    "headers": { "Authorization": "Bearer mn_live_..." } } } }
+Mnemos runs on AWS Lambda behind API Gateway. `/health` needs no credential,
+and the first thing it tells you is whether the guarantee actually holds:
+
+```console
+$ curl -s https://l78rw3uwyb.execute-api.us-east-1.amazonaws.com/health | jq .posture
+{
+  "privilege_separation": true,
+  "privilege_separation_source": "measured",
+  "db_user": "mnemos_api_svc",
+  "api_can_delete": false,
+  "warden_can_delete": true,
+  ...
+}
 ```
 
-Don't want to install anything? The read-only **judge tenant** is pre-seeded
-with the full story and needs no key: [console link](#).
+`api_can_delete: false` is not read from a config file. At startup the service
+asks CockroachDB whether the role it connected as holds `DELETE` on the memory
+tables, and reports what the cluster says. `"source": "measured"` means it
+asked; `"configured"` would mean it only compared two connection strings.
+
+Connect your own agent (Claude Code shown; Cursor, LangGraph and plain-SDK
+snippets in [docs/clients.md](docs/clients.md)):
+
+```console
+$ claude mcp add --transport http mnemos https://<host>/mcp \
+    --header "Authorization: Bearer mn_live_..."
+```
+
+Then prove the deployment is not merely alive but still honest — nine checks,
+non-zero exit if any guarantee has stopped holding:
+
+```console
+$ make smoke
+  PASS  privilege separation is measured, not assumed — source=measured
+  PASS  the API's database role holds no DELETE (invariant 1) — db_user=mnemos_api_svc
+  PASS  remember refuses a foreign-homed subject (invariant 4)
+  PASS  a write key cannot reach a destructive tool
+  PASS  every audit chain recomputes — 14 entries across 7 shards
+```
 
 ## The four demo moments
 

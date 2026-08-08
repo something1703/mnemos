@@ -1,0 +1,18 @@
+{
+  "$comment": [
+    "Claude Code / Cursor MCP config for Mnemos.",
+    "Copy to .mcp.json (project) or ~/.cursor/mcp.json, then:",
+    "  export MNEMOS_API_URL=https://<host>",
+    "  export MNEMOS_API_KEY=$(mnemos-api mint-key --tenant clinic --scope write --label laptop | grep mn_live_)",
+    "The ${VAR} form keeps the bearer token out of a file that may get committed."
+  ],
+  "mcpServers": {
+    "mnemos": {
+      "type": "http",
+      "url": "${MNEMOS_API_URL}/mcp",
+      "headers": {
+        "Authorization": "Bearer ${MNEMOS_API_KEY}"
+      }
+    }
+  }
+}
