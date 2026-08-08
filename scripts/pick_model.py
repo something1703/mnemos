@@ -96,27 +96,46 @@ def probe_embedding(model: str, dimensions: int) -> None:
     print(f"  OK  {model} -> {got} dimensions (probe cost: {used} tokens)")
 
 
-def probe_chat(model: str) -> None:
-    """One-token liveness check. Cheapest possible proof the ID is real AND
-    that this key is entitled to it — being listed in /v1/models is not always
-    the same as being callable."""
+def probe_chat(model: str, max_tokens: int = 2000) -> None:
+    """Liveness check that also measures REASONING token spend.
+
+    The budget-relevant detail: reasoning models bill internal thinking as
+    output tokens, so a "cheap per-token" model can still be expensive per
+    call. A 1-token probe is not just useless here, it actively fails — the
+    model cannot finish thinking in one token. So this asks a trivial question
+    with real headroom and reports the reasoning/visible split, which is the
+    number that actually predicts cost on a $5 budget.
+    """
     try:
         result = _request(
             "/chat/completions",
             {
                 "model": model,
-                "messages": [{"role": "user", "content": "hi"}],
-                "max_completion_tokens": 1,
+                "messages": [{"role": "user", "content": "Reply with exactly: ok"}],
+                "max_completion_tokens": max_tokens,
             },
         )
     except SystemExit as exc:
         print(f"  FAIL  {model}: {exc}")
         return
+
     usage = result.get("usage", {})
-    print(
-        f"  OK  {model} (probe cost: {usage.get('prompt_tokens', '?')} in / "
-        f"{usage.get('completion_tokens', '?')} out)"
-    )
+    prompt = usage.get("prompt_tokens", 0)
+    completion = usage.get("completion_tokens", 0)
+    reasoning = usage.get("completion_tokens_details", {}).get("reasoning_tokens", 0)
+    visible = completion - reasoning
+    content = (result["choices"][0]["message"].get("content") or "").strip()
+
+    print(f"  OK  {model}")
+    print(f"      reply:     {content[:60]!r}")
+    print(f"      prompt:    {prompt} tokens")
+    print(f"      output:    {completion} tokens ({reasoning} reasoning + {visible} visible)")
+    if reasoning:
+        print(
+            f"      NOTE: {reasoning} reasoning tokens billed as output for a trivial\n"
+            f"            prompt — budget accordingly, or use a non-reasoning model\n"
+            f"            for the high-volume distillation calls."
+        )
 
 
 def main() -> int:
