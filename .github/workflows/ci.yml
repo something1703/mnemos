@@ -47,25 +47,54 @@ jobs:
         with:
           enable-cache: true
 
+      # Must precede every `uv run` below — db/scripts/probe.py and the test
+      # suite both need packages/engine's and packages/warden's dependencies
+      # (psycopg, boto3, ...), which only the workspace sync installs. This
+      # step ran AFTER the probe once; fixed once, guarded here so it cannot
+      # silently regress back to that order.
+      - run: uv sync --all-packages --group dev
+
       - name: Start CockroachDB
         # Uses the same compose file developers use, so "works in CI" and
         # "works on my machine" cannot diverge.
         run: make db-local
 
       - name: Verify cluster capabilities
-        # The probe is a test, not a chore: if a CockroachDB upgrade removes a
-        # capability the design depends on, CI says so before a human notices.
+        # The probe is a test, not a chore: --strict fails this job outright if
+        # any CRITICAL capability is missing on the cluster THIS job is running
+        # against, which is the property CI actually needs to guard.
+        #
+        # docs/cluster-capabilities.md itself is a snapshot of the CLOUD
+        # cluster (regenerated deliberately, by a developer running
+        # `make db-probe` against cloud, and committed on purpose — see
+        # ADR-006). It is not diffed here: this job's local Docker cluster
+        # legitimately differs from cloud in build arch, current_user, replica
+        # count, and default gc.ttlseconds even when every capability the
+        # design depends on is identically supported, so a byte-diff against
+        # that file can never pass here regardless of real drift.
         run: |
           uv run python db/scripts/probe.py \
             --url 'postgresql://root@localhost:26257/defaultdb?sslmode=disable' \
             --strict
+          git checkout -- docs/cluster-capabilities.md
 
-      - name: Fail if the capability report drifted
-        # docs/cluster-capabilities.md is generated. If it changed, the cluster
-        # changed, and that belongs in a commit with an ADR — not as a surprise.
-        run: git diff --exit-code docs/cluster-capabilities.md
+      - name: Apply migrations
+        run: make db-migrate
+        env:
+          MNEMOS_DB_URL: postgresql://root@localhost:26257/mnemos?sslmode=disable
 
-      - run: uv sync --all-packages --group dev
+      - name: Seed
+        # tests/security/test_rls_isolation.py depends on the CLINIC/OPS/
+        # FINANCE tenant rows this creates (its own module docstring says so).
+        # Every earlier local run of this suite "passed" only because this
+        # developer's machine had leftover tenant rows from unrelated manual
+        # seed.py runs earlier in the session — masking that CI never ran
+        # this step at all. First run against a genuinely fresh, unseeded
+        # cluster is what surfaced it.
+        run: make db-seed
+        env:
+          MNEMOS_DB_URL: postgresql://root@localhost:26257/mnemos?sslmode=disable
+
       - run: make cov
         env:
           MNEMOS_DB_URL_LOCAL: postgresql://root@localhost:26257/mnemos?sslmode=disable
@@ -82,6 +111,10 @@ jobs:
           enable-cache: true
       - run: uv sync --all-packages --group dev
       - run: make db-local
+      - name: Apply migrations
+        run: make db-migrate
+        env:
+          MNEMOS_DB_URL: postgresql://root@localhost:26257/mnemos?sslmode=disable
       - run: |
           if [ -n "$(find redteam -name 'test_*.py' 2>/dev/null)" ]; then
             make redteam-ci

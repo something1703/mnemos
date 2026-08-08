@@ -27,6 +27,8 @@ import psycopg
 import pytest
 from db.seed import CLINIC, FINANCE, OPS, fake_embedding
 
+from tests.conftest import append_audit
+
 pytestmark = pytest.mark.security
 
 OTHER_TENANTS = [OPS, FINANCE]
@@ -54,6 +56,39 @@ def _require_seed(conn: psycopg.Connection) -> None:
         cur.execute("SELECT count(*) FROM mnemos.semantic_facts")
         if cur.fetchone()[0] == 0:
             pytest.skip("no seeded data. Run: make db-seed")
+
+
+def _ensure_bulk_facts(conn: psycopg.Connection, tenant_id, *, minimum: int) -> None:
+    """Top up a tenant's fact count to at least `minimum`, each with a real
+    (fake-embedder-shaped) vector, through the real audited insert path.
+
+    Idempotent: only inserts the shortfall, so re-running the test suite
+    against a warm cluster does not keep growing the table."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT count(*) FROM mnemos.semantic_facts WHERE tenant_id = %s", (tenant_id,))
+        have = cur.fetchone()[0]
+    need = minimum - have
+    if need <= 0:
+        return
+
+    with conn.transaction(), conn.cursor() as cur:
+        append_audit(cur, tenant_id, op="consolidate", subject_key="bulk:isolation-test")
+        for i in range(need):
+            vector = (
+                "["
+                + ",".join(f"{((i * 37 + j * 7) % 200 - 100) / 100:.4f}" for j in range(1024))
+                + "]"
+            )
+            cur.execute(
+                """
+                INSERT INTO mnemos.semantic_facts
+                    (tenant_id, fact_id, home_region, subject_key, fact_kind,
+                     text_ciphertext, text_dek_wrapped, text_hash, embedding, trust)
+                VALUES
+                    (%s, gen_random_uuid(), 'us-east-1', %s, 'note', %s, %s, %s, %s, 'unverified')
+                """,
+                (tenant_id, f"bulk:isolation-test:{i}", b"\x00", b"\x00", b"\x00", vector),
+            )
 
 
 @pytest.mark.parametrize("table", TENANT_SCOPED_TABLES)
@@ -91,10 +126,26 @@ def test_vector_index_partitions_by_tenant_prefix(admin_conn) -> None:
     by a filter, and would silently degrade recall as tenants grow — a
     correctness problem wearing a performance costume.
     """
+    # Self-contained rather than relying on `make db-seed` or incidental rows
+    # left behind by earlier tests. Two failure modes were found reproducing
+    # this against a genuinely fresh, just-migrated cluster (zero prior
+    # activity — exactly the state a real CI runner starts in every time):
+    #
+    #   1. With no table statistics yet, CockroachDB's optimizer picks a full
+    #      scan ("missing stats") over the vector index.
+    #   2. Once statistics exist but the table is tiny (~40 rows, matching
+    #      what a handful of unrelated tests happen to leave behind), a full
+    #      scan is the genuinely CHEAPER, correct plan — CockroachDB is right
+    #      to prefer it at that size, and vector indexes are meant to win at
+    #      real scale, not on a near-empty table.
+    #
+    # So this test brings its own scale: ~150 synthetic facts is comfortably
+    # past the threshold observed experimentally (100 rows already flips the
+    # plan; 42 does not), independent of whatever ran before it.
+    _ensure_bulk_facts(admin_conn, CLINIC, minimum=150)
+
     with admin_conn.cursor() as cur:
-        cur.execute("SELECT count(*) FROM mnemos.semantic_facts")
-        if cur.fetchone()[0] == 0:
-            pytest.skip("no seeded data. Run: make db-seed")
+        cur.execute("ANALYZE mnemos.semantic_facts")
         cur.execute(
             "EXPLAIN SELECT fact_id FROM mnemos.semantic_facts WHERE tenant_id = %s "
             "ORDER BY embedding <-> %s::VECTOR LIMIT 5",
