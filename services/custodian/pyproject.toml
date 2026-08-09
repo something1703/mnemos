@@ -6,9 +6,23 @@ requires-python = ">=3.12"
 license = { text = "Apache-2.0" }
 dependencies = [
     "mnemos-engine",
-    "mcp>=1.1",
+    "mcp>=2.0",
     "boto3>=1.35",
     "pydantic>=2.9",
+    # Vendored SKILL.md files carry YAML frontmatter (name/description/
+    # compatibility/metadata) — parsed for real rather than hand-rolled, since
+    # unlike this project's own audit-chain payloads (docs/ledger.md's
+    # canonical JSON), skill frontmatter is untrusted vendor content with no
+    # canonical-encoding contract to preserve.
+    "pyyaml>=6.0",
+    # The Cloud MCP client needs a custom AsyncClient (auth header +
+    # mcp-cluster-id header) to hand to mcp.client.streamable_http_client.
+    # `mcp>=2.0` requires httpx2, its own fork of httpx, NOT plain httpx —
+    # streamable_http_client's http_client= param is typed against
+    # httpx2.AsyncClient specifically, so that is what mcp_client.py
+    # constructs. Named explicitly for the same reason services/api names
+    # boto3 explicitly despite it arriving transitively via mnemos-warden.
+    "httpx2>=2.5.0",
 ]
 
 # The Custodian is the one component that IS an LLM agent, and therefore the one
@@ -23,6 +37,14 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mnemos_custodian"]
+# hatchling's default artifact set is Python files — a wheel build without
+# this line ships without the vendored skills (SKILL.md, references/*.md,
+# LICENSE) and fails only at import time, once deployed. Same reasoning as
+# mnemos-sleep-cycle's prompts/*.md artifacts line.
+artifacts = [
+    "src/mnemos_custodian/vendor/**/*.md",
+    "src/mnemos_custodian/vendor/**/LICENSE",
+]
 
 [tool.uv.sources]
 mnemos-engine = { workspace = true }

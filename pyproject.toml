@@ -25,6 +25,7 @@ dev = [
     "mypy>=1.13",
     "types-psycopg2",
     "boto3-stubs[kms,s3]>=1.35",
+    "types-pyyaml",
     # FastAPI's own recommended way to test routes in-process, no server
     # socket needed. Test-only: services/api's own runtime dependencies
     # don't need it.
@@ -74,6 +75,10 @@ ignore = [
 # is a Python-source convention; wrapping the JavaScript to 100 columns would
 # only make it harder to read as JavaScript.
 "services/api/src/mnemos_api/deposition_html.py" = ["E501"]
+# `raise ReadOnlyGuaranteeViolated(...)` and `except ToolNotAllowlisted` read
+# as sentences; both subclass Exception directly, same reasoning as the
+# other N818 exemptions above.
+"services/custodian/src/mnemos_custodian/mcp_client.py" = ["N818"]
 
 [tool.mypy]
 python_version = "3.12"
