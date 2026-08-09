@@ -157,6 +157,22 @@ five that matter most for a security review:
   recency) come from the same underlying REST API instead, called directly
   with the same Bearer token already used for the MCP server. `docs/
   limits.md` §`ccloud` CLI cannot run non-interactively.
+- **The Custodian's IAM boundary is real, but it is defense in depth for a
+  guarantee code already enforces, not a second independent enforcement
+  mechanism.** Deployed on ECS Fargate (PHASE_07 7.6): the task role
+  (`mnemos-custodian-task`) carries no `Allow` statements at all — the app
+  has no AWS SDK dependency and never calls AWS itself — only explicit
+  `Deny` on `lambda:InvokeFunction` against any `mnemos-warden-*` function
+  (none is deployed yet) and on `kms:ScheduleKeyDeletion`/`kms:DisableKey`
+  against the three tenant CMKs. Since the role's `Allow` surface is already
+  empty, neither `Deny` currently blocks anything it wouldn't already fail
+  to do; they exist so that a future policy attached to this role by mistake
+  still can't reach either action. Verified live: a scheduled sweep
+  (`events-rule/mnemos-custodian-scheduled`) and a manually-triggered alarm
+  sweep (`events-rule/mnemos-custodian-alarm-triggered`, fired by
+  `aws cloudwatch set-alarm-state` against `mnemos-sleep-cycle-errors`) both
+  ran end-to-end and exited 0, observed in `/ecs/mnemos-custodian`.
+  `infra/custodian/README.md`.
 - **Dual control proves a second key, not a second human** (§2 above).
 - **What has not been executed yet, stated plainly:** adversarial
   red-teaming (Phase 10) and load/scale measurement (Phase 11) have not run

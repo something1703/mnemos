@@ -77,6 +77,23 @@ no separate Warden execution role is deployed yet; see ADR-013.
 account root, even if the project is torn down early. Confirmed empirically
 before any code was written against it (ADR-013).
 
+### ECS Fargate (PHASE_07 7.6, provisioned 2026-08-09)
+
+| Item | Value |
+|---|---|
+| Cluster | `mnemos-custodian` |
+| Task definition | `mnemos-custodian` (0.25 vCPU / 0.5 GB, ARM64) |
+| ECR repository | `mnemos-custodian` |
+| Task execution role | `mnemos-custodian-exec` — `AmazonECSTaskExecutionRolePolicy` + `secretsmanager:GetSecretValue` on `mnemos/custodian-*` |
+| Task role | `mnemos-custodian-task` — no `Allow` statements; explicit `Deny` only (see security.md) |
+| Secret | `mnemos/custodian` |
+| Log group | `/ecs/mnemos-custodian` |
+| Security group | `mnemos-custodian-task` — no inbound rules |
+| Schedule | `mnemos-custodian-scheduled`, `rate(6 hours)` |
+| Alarm rule | `mnemos-custodian-alarm-triggered`, reacts to `mnemos-api-p95-latency`, `mnemos-sleep-cycle-consolidation-lag`, `mnemos-sleep-cycle-errors` |
+
+Full detail and the reasoning behind each choice: `infra/custodian/README.md`.
+
 ## Still to provision
 
 - [ ] Bedrock model access — Claude + `amazon.titan-embed-text-v2:0` (Phase 05)
