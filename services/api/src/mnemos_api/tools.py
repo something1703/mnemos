@@ -24,6 +24,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
+import psycopg
 from mnemos_engine.accountability import explain as engine_explain
 from mnemos_engine.accountability import record_action as engine_record_action
 from mnemos_engine.errors import (
@@ -39,6 +40,7 @@ from mnemos_engine.procedural import find_skill as engine_find_skill
 from mnemos_engine.procedural import learn_skill as engine_learn_skill
 from mnemos_warden.errors import UnknownSubject
 from mnemos_warden.models import EraseMode
+from mnemos_warden.residency import enforce_recall_projection
 
 from .context import current_principal
 from .keys import Scope, require
@@ -218,6 +220,11 @@ def register_tools(server: Any, runtime: Runtime) -> None:
             "results are thin, the correct reading is 'nothing is trusted yet', not "
             "'nothing is known'. A rising withheld count is also the leading "
             "indicator of a poisoning attempt.\n\n"
+            "Separately, facts homed in another jurisdiction may be withheld by "
+            "residency policy regardless of trust — reported as residency_withheld. "
+            "That count existing and staying at zero for a normal query is expected; "
+            "it existing and being nonzero means this instance is not the right place "
+            "to ask about that subject, not that the memory does not exist.\n\n"
             "Returns recall_ids; pass them to record_action if you act on what you "
             "were told. Contested facts are returned as pairs with both sides' "
             "evidence rather than silently resolved."
@@ -239,7 +246,10 @@ def register_tools(server: Any, runtime: Runtime) -> None:
             include_unverified=include_unverified,
             session_id=UUID(session_id) if session_id else None,
         )
-        return _render_recall(result)
+        result, residency_withheld = await _apply_residency(runtime, principal, result)
+        payload = _render_recall(result)
+        payload["residency_withheld"] = residency_withheld
+        return payload
 
     @server.tool(
         name="recall_as_of",
@@ -278,7 +288,9 @@ def register_tools(server: Any, runtime: Runtime) -> None:
                 "Subjects under legal hold get an extended window."
             ) from exc
 
+        result, residency_withheld = await _apply_residency(runtime, principal, result)
         payload = _render_recall(result)
+        payload["residency_withheld"] = residency_withheld
         payload["as_of"] = as_of
         payload["note"] = "historical view; nothing was reinforced or logged"
         return payload
@@ -683,6 +695,48 @@ def register_tools(server: Any, runtime: Runtime) -> None:
     log.info("MCP tools registered")
 
 
+async def _apply_residency(runtime: Runtime, principal: Any, result: Any) -> tuple[Any, int]:
+    """Filter a RecallResult down to what this deployment's region may serve,
+    before it is ever rendered to JSON. Returns `(filtered_result, withheld)`.
+
+    `enforce_recall_projection` (packages/warden) is a real, unit-tested
+    implementation of invariant 4's read side — but until this call existed,
+    nothing in the request path actually invoked it. `recall()` returned every
+    matching fact's full text regardless of the fact's home region, which
+    meant a single-region deployment happened to look correct only because it
+    never asked the question a multi-region one would answer wrong. This is
+    the one call site that turns the module from a unit-tested capability into
+    an enforced one.
+
+    Runs in its own transaction, separate from `engine.recall()`'s: a crossing
+    denial has to be logged (an INSERT), and `recall_as_of`'s own transaction
+    is `AS OF SYSTEM TIME` and read-only, which cannot write at all. The
+    residency *policy* applied is always the current one — a policy change
+    takes effect immediately on what can be served, regardless of when the
+    underlying fact was originally recalled.
+
+    The withheld count exists for the same reason `unverified_withheld`
+    exists: an agent that sees an empty `facts` list has to be able to tell
+    "nothing matched" apart from "something matched and was not servable
+    here" — the trust-gate version of that distinction already shipped in
+    Phase 03; a residency-filtered result deserves the same legibility, not a
+    silent empty list that reads as "nothing is known".
+    """
+    before = len(result.facts)
+
+    async def run(cur: psycopg.AsyncCursor) -> Any:
+        return await enforce_recall_projection(
+            cur,
+            principal.tenant_id,
+            result,
+            requester_region=runtime.settings.region,
+            requested_by=f"key:{principal.key_id}",
+        )
+
+    filtered = await runtime.db.transaction(principal.tenant_id, run, label="enforce_residency")
+    return filtered, before - len(filtered.facts)
+
+
 def _render_recall(result: Any) -> dict[str, Any]:
     return {
         "facts": [
@@ -703,10 +757,11 @@ def _render_recall(result: Any) -> dict[str, Any]:
                     "trust_weight": s.breakdown.trust_weight,
                 },
                 # Which episodes this fact traces back to — invariant 3, made
-                # inspectable. Event content is never included here (only the
-                # id); a caller wanting the text itself goes through
-                # explain(), which applies the same residency-aware
-                # projection rules recall() does everywhere else.
+                # inspectable. Event content is never included here, only the
+                # id and a hash (explain() is the same: it never decrypts or
+                # returns episode text at all, by design, which is a stronger
+                # guarantee than residency-filtering would be, not a
+                # substitute for it).
                 "provenance": [
                     {"event_id": str(p.event_id), "weight": p.weight} for p in s.provenance
                 ],
