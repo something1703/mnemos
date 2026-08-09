@@ -97,6 +97,7 @@ markers = [
     "aws: requires live AWS credentials",
     "security: adversarial isolation and attack-surface tests",
     "slow: excluded from the default PR run",
+    "llm: calls a real model API and spends real money — run explicitly, not on every PR",
 ]
 
 [tool.coverage.report]

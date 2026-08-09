@@ -38,12 +38,16 @@ typecheck: ## mypy (strict on packages/)
 	uv run mypy
 
 .PHONY: test
-test: ## Unit tests (no cloud, no rig, no AWS)
-	uv run pytest -m "not cloud and not rig and not aws and not slow"
+test: ## Unit tests (no cloud, no rig, no AWS, no live model calls)
+	uv run pytest -m "not cloud and not rig and not aws and not slow and not llm"
 
 .PHONY: test-aws
 test-aws: ## Tests needing real AWS resources (KMS keys, S3 Object Lock bucket)
 	uv run pytest -m aws -v
+
+.PHONY: golden-eval
+golden-eval: ## Phase 05.1 distillation quality eval — spends real OpenAI credit, run deliberately
+	uv run pytest tests/sleep_cycle/test_golden_eval.py -m llm -v -s
 
 .PHONY: cov
 cov: ## Coverage gate: packages/ must hold 90%

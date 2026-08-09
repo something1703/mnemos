@@ -25,13 +25,12 @@ from dataclasses import dataclass
 import psycopg
 from mnemos_engine.crypto import Envelope, LocalKeyWrapper
 from mnemos_engine.db import Database
-from mnemos_engine.embeddings import Embedder, FakeEmbedder
+from mnemos_engine.embeddings import Embedder, FakeEmbedder, OpenAIEmbedder
 from mnemos_engine.engine import MnemosEngine
 from mnemos_warden.keys import KeyProvider, LocalKeyProvider
 from mnemos_warden.warden import Warden
 
 from .config import Settings, get_settings
-from .embedding import OpenAIEmbedder
 
 log = logging.getLogger("mnemos.api.runtime")
 

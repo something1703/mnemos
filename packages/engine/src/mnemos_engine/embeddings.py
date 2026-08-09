@@ -1,23 +1,45 @@
 """Embedding providers.
 
 An interface with two implementations: `FakeEmbedder` (deterministic, for CI and
-local work) and `TitanEmbedder` (Bedrock, wired in Phase 05). The engine never
-knows which it holds, so no test needs network access or model credentials to
-exercise the retrieval plumbing.
+local work) and `OpenAIEmbedder` (real vectors, used by the API and the sleep
+cycle). The engine never knows which it holds, so no test needs network access
+or model credentials to exercise the retrieval plumbing.
 
 The fake is deterministic rather than random on purpose: a test that seeds
 different vectors on each run cannot assert on ranking, and a ranking test that
 cannot assert on ranking quietly becomes a smoke test.
+
+`OpenAIEmbedder` lives here rather than in `services/api` because the sleep
+cycle needs the identical provider — a consolidation run embedding facts with a
+different model or dimension than `recall` searches with would silently break
+retrieval, and putting both call sites through one implementation is the only
+way that mistake cannot happen. It must never migrate into `packages/warden`:
+`make no-model-in-warden` enforces that at the import-graph level, not just by
+convention.
 """
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
+import json
+import logging
 import math
-from typing import Protocol
+import time
+import urllib.error
+import urllib.request
+from typing import Any, Protocol
+
+log = logging.getLogger("mnemos.embeddings")
 
 EMBED_DIM = 1024
-"""Titan Embed v2 output dimension. The VECTOR(1024) column shape depends on it."""
+"""Default output dimension. The VECTOR(1024) column shape depends on it —
+OpenAIEmbedder can be constructed with a different value, but doing so needs a
+matching migration."""
+
+_ENDPOINT = "https://api.openai.com/v1/embeddings"
+_TIMEOUT_SECONDS = 30
+_MAX_ATTEMPTS = 3
 
 
 class Embedder(Protocol):
@@ -25,6 +47,15 @@ class Embedder(Protocol):
 
     @property
     def dimension(self) -> int: ...
+
+
+class EmbeddingError(RuntimeError):
+    """The embedding provider could not be reached or refused the request.
+
+    Surfaced rather than swallowed: silently returning a zero vector would
+    poison the index with a value that is *plausibly* near everything, which is
+    far worse than a failed request.
+    """
 
 
 class FakeEmbedder:
@@ -57,23 +88,99 @@ class FakeEmbedder:
         return [v / norm for v in raw]
 
 
-class TitanEmbedder:
-    """Amazon Titan Embed Text v2 via Bedrock. Wired fully in Phase 05.
+class OpenAIEmbedder:
+    """Batching embedder that enforces the dimension contract on every call.
 
-    Kept behind the same Protocol so swapping it in changes one construction
-    site and no query code.
+    The dimension assertion is not paranoia. The schema is `VECTOR(1024)` with
+    data already in it; a provider that silently returned 1536 would either
+    error deep inside an INSERT or, worse, be truncated somewhere and corrupt
+    similarity comparisons against existing rows.
+
+    Deliberately implemented with `urllib` rather than the `openai` SDK — one
+    POST does not justify a dependency, and keeping the provider integration to
+    the standard library means it cannot drift into `packages/warden` by
+    accident (there is nothing to drift).
     """
 
-    def __init__(self, client: object, model_id: str = "amazon.titan-embed-text-v2:0") -> None:
-        self._client = client
-        self._model_id = model_id
+    def __init__(self, *, api_key: str, model: str, dimensions: int) -> None:
+        self._api_key = api_key
+        self._model = model
+        self._dimensions = dimensions
 
     @property
     def dimension(self) -> int:
-        return EMBED_DIM
+        return self._dimensions
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
-        raise NotImplementedError("wired in Phase 05.2 alongside the consolidation Lambda")
+        if not texts:
+            return []
+        # One request for the whole batch — the endpoint accepts a list, and
+        # per-text requests would multiply latency and overhead for no gain.
+        return await asyncio.to_thread(self._embed_sync, texts)
+
+    def _embed_sync(self, texts: list[str]) -> list[list[float]]:
+        payload = {
+            "model": self._model,
+            "input": texts,
+            "dimensions": self._dimensions,
+        }
+        body = json.dumps(payload).encode("utf-8")
+
+        last_error: Exception | None = None
+        for attempt in range(1, _MAX_ATTEMPTS + 1):
+            try:
+                result = self._post(body)
+                break
+            except EmbeddingError as exc:
+                last_error = exc
+                if attempt == _MAX_ATTEMPTS:
+                    raise
+                delay = 0.5 * (2 ** (attempt - 1))
+                log.warning(
+                    "embedding attempt %d/%d failed (%s); retrying in %.1fs",
+                    attempt,
+                    _MAX_ATTEMPTS,
+                    exc,
+                    delay,
+                )
+                time.sleep(delay)
+        else:  # pragma: no cover - loop always breaks or raises
+            raise EmbeddingError(str(last_error))
+
+        vectors = [item["embedding"] for item in sorted(result["data"], key=lambda d: d["index"])]
+
+        if len(vectors) != len(texts):
+            raise EmbeddingError(f"asked for {len(texts)} embeddings, received {len(vectors)}")
+        for vector in vectors:
+            if len(vector) != self._dimensions:
+                raise EmbeddingError(
+                    f"{self._model} returned {len(vector)} dimensions, "
+                    f"schema requires exactly {self._dimensions}"
+                )
+
+        usage = result.get("usage", {})
+        log.debug("embedded %d text(s), %s tokens", len(texts), usage.get("total_tokens", "?"))
+        return vectors
+
+    def _post(self, body: bytes) -> dict[str, Any]:
+        request = urllib.request.Request(
+            _ENDPOINT,
+            data=body,
+            headers={
+                "Authorization": f"Bearer {self._api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=_TIMEOUT_SECONDS) as response:  # noqa: S310
+                parsed: dict[str, Any] = json.loads(response.read())
+                return parsed
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode(errors="replace")[:400]
+            raise EmbeddingError(f"HTTP {exc.code}: {detail}") from exc
+        except urllib.error.URLError as exc:
+            raise EmbeddingError(f"could not reach the embedding endpoint: {exc}") from exc
 
 
 def to_pgvector(vector: list[float]) -> str:

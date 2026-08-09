@@ -10,10 +10,13 @@ dependencies = [
     "pydantic>=2.9",
 ]
 
-# This service invokes Bedrock, so it is untrusted by construction: everything
-# it writes lands at trust='unverified' and must be independently corroborated
-# before it becomes recallable (Phase 05.4). It holds no DELETE grant — decay
-# lowers strength, it never removes rows.
+# This service invokes an LLM (OpenAI; see ADR-014), so it is untrusted by
+# construction: everything it writes lands at trust='unverified' and must be
+# independently corroborated before it becomes recallable (Phase 05.4). It
+# holds no DELETE grant — decay lowers strength, it never removes a row.
+
+[project.scripts]
+mnemos-sleep-cycle = "mnemos_sleep_cycle.cli:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -21,6 +24,11 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mnemos_sleep_cycle"]
+# The distillation prompt is data the package needs at runtime, not source —
+# hatchling's default artifact set is Python files, so a wheel build without
+# this line would ship without prompts/distill.md and fail at import time only
+# once deployed, which is the worst place to discover it.
+artifacts = ["src/mnemos_sleep_cycle/prompts/*.md"]
 
 [tool.uv.sources]
 mnemos-engine = { workspace = true }
