@@ -175,7 +175,7 @@ if [[ "$SG_ID" == "None" || -z "$SG_ID" ]]; then
   say "Creating security group ${SG_NAME}"
   SG_ID="$(aws ec2 create-security-group --region "$REGION" --vpc-id "$VPC_ID" \
     --group-name "$SG_NAME" \
-    --description "Mnemos Custodian ECS task — outbound only, no inbound rules" \
+    --description "Mnemos Custodian ECS task -- outbound only, no inbound rules" \
     --query GroupId --output text)"
 fi
 
