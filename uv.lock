@@ -785,6 +785,7 @@ name = "mnemos-api"
 version = "0.1.0"
 source = { editable = "services/api" }
 dependencies = [
+    { name = "boto3" },
     { name = "fastapi" },
     { name = "mangum" },
     { name = "mcp" },
@@ -796,6 +797,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "boto3", specifier = ">=1.35" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "mangum", specifier = ">=0.19" },
     { name = "mcp", specifier = ">=2.0" },

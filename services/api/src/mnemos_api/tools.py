@@ -38,6 +38,7 @@ from mnemos_engine.ledger import verify_chain
 from mnemos_engine.models import SourceTrust
 from mnemos_engine.procedural import find_skill as engine_find_skill
 from mnemos_engine.procedural import learn_skill as engine_learn_skill
+from mnemos_warden.attestation import presign_anchor_url
 from mnemos_warden.errors import UnknownSubject
 from mnemos_warden.models import EraseMode
 from mnemos_warden.residency import enforce_recall_projection
@@ -304,6 +305,10 @@ def register_tools(server: Any, runtime: Runtime) -> None:
             "Reports historical state, not current — a fact that was trusted when used "
             "and is quarantined today shows both. If the action was influenced by "
             "memory that has since been revoked, it says so explicitly.\n\n"
+            "When the covering checkpoint has been anchored to S3 Object Lock, the "
+            "response includes anchor_presigned_url: a time-limited link (no AWS "
+            "credentials needed) to fetch and independently verify that anchored root, "
+            "not just trust the anchor_uri string.\n\n"
             "Source episode CONTENT is never included, only its hash: a deposition may "
             "legitimately cross a jurisdiction the underlying record may not."
         ),
@@ -320,6 +325,26 @@ def register_tools(server: Any, runtime: Runtime) -> None:
         if deposition is None:
             raise ToolError(f"no action {action_id} in this tenant")
 
+        anchor_presigned_url = None
+        if deposition.anchor_uri and runtime.s3 and runtime.settings.anchor_bucket:
+            # A judge holding this deposition should be able to fetch and
+            # verify the anchored root without ever holding an AWS credential
+            # of their own — the raw s3:// URI alone cannot do that, since the
+            # bucket is deliberately private (ADR-013). Best-effort: a signing
+            # failure here must not fail the whole deposition, since
+            # everything a caller actually needs to verify the chain
+            # themselves (checkpoint_seq, merkle_root, anchor_uri) is already
+            # in the response above.
+            try:
+                anchor_presigned_url = presign_anchor_url(
+                    s3=runtime.s3,
+                    bucket=runtime.settings.anchor_bucket,
+                    tenant_id=principal.tenant_id,
+                    checkpoint_seq=deposition.checkpoint_seq,
+                )
+            except Exception:
+                log.warning("failed to presign anchor URL for deposition", exc_info=True)
+
         return {
             "action_id": str(deposition.action_id),
             "action_type": deposition.action_type,
@@ -330,6 +355,8 @@ def register_tools(server: Any, runtime: Runtime) -> None:
             "checkpoint_seq": deposition.checkpoint_seq,
             "merkle_root": deposition.merkle_root,
             "anchor_uri": deposition.anchor_uri,
+            "anchor_presigned_url": anchor_presigned_url,
+            "anchor_presigned_url_expires_in": 3600 if anchor_presigned_url else None,
             "anchored": deposition.anchor_uri is not None,
             "facts": [
                 {

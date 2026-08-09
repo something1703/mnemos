@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import psycopg
 from mnemos_engine.crypto import Envelope, LocalKeyWrapper
@@ -32,6 +33,9 @@ from mnemos_warden.keys import KeyProvider, LocalKeyProvider
 from mnemos_warden.warden import Warden
 
 from .config import Settings, get_settings
+
+if TYPE_CHECKING:  # boto3-stubs is dev-only — see mnemos_warden.keys
+    from mypy_boto3_s3 import S3Client
 
 log = logging.getLogger("mnemos.api.runtime")
 
@@ -72,6 +76,17 @@ class Runtime:
     embedder: Embedder
     key_provider: KeyProvider
     db_posture: DbPosture | None = None
+    s3: S3Client | None = None
+    """Set only when `MNEMOS_S3_ANCHOR_BUCKET` is configured. Used solely to
+    presign a read-only, time-limited URL onto an already-anchored checkpoint
+    for `explain()`'s deposition — never to write. The API Lambda's IAM role
+    grants exactly `s3:GetObject`/`s3:GetObjectRetention`/`s3:ListBucket` on
+    that one bucket (infra/api/exec-policy.json's `ReadLedgerAnchorsOnly`
+    statement), so a presigned URL this client signs can never authorize more
+    than a caller with the raw `s3://` URI and no credentials could already
+    ask a judge to fetch by hand — it only saves them the trip through the
+    AWS CLI.
+    """
 
     def describe_posture(self) -> dict[str, object]:
         """Configured posture, corrected by what the database actually grants.
@@ -246,6 +261,12 @@ async def build_runtime(settings: Settings | None = None) -> Runtime:
 
     db_posture = await _probe_posture(db, warden_db)
 
+    s3: S3Client | None = None
+    if settings.anchor_bucket:
+        import boto3
+
+        s3 = boto3.client("s3", region_name=settings.region)
+
     return Runtime(
         settings=settings,
         db=db,
@@ -255,4 +276,5 @@ async def build_runtime(settings: Settings | None = None) -> Runtime:
         embedder=embedder,
         key_provider=key_provider,
         db_posture=db_posture,
+        s3=s3,
     )

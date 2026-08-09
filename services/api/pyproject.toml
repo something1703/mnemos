@@ -28,6 +28,11 @@ dependencies = [
     "pydantic>=2.9",
     # Lambda adapter. Pure Python, so nothing extra to install into the image.
     "mangum>=0.19",
+    # Already a transitive dep via mnemos-warden (S3 Object Lock, KMS); named
+    # explicitly because runtime.py imports it directly too, to presign a
+    # deposition's anchor URL — depending on something only implicitly would
+    # be the kind of coupling this project's own pyproject comments warn about.
+    "boto3>=1.35",
 ]
 
 [project.scripts]
