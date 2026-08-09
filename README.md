@@ -103,7 +103,8 @@ the Cloud MCP Server — read-only, cluster-scoped, allowlisted SQL only.
 
 Full narrative: [docs/architecture.md](docs/architecture.md) ·
 Decisions: [docs/decisions.md](docs/decisions.md) ·
-Threat model: [docs/threat-model.md](docs/threat-model.md)
+Threat model: [docs/threat-model.md](docs/threat-model.md) ·
+Governance: [docs/governance.md](docs/governance.md)
 
 ## Quickstart
 
