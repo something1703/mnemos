@@ -618,12 +618,18 @@ def register_tools(server: Any, runtime: Runtime) -> None:
     @server.tool(
         name="revoke_source",
         description=(
-            "Quarantine everything a poisoned source touched, transitively, in ONE "
-            "transaction. Requires the 'admin' scope and confirm=true.\n\n"
-            "Facts and skills are quarantined rather than deleted: a revocation says "
-            "the evidence should not be trusted, not that the record of what happened "
-            "should vanish. Affected actions are marked contaminated, so explain() on "
-            "them reports it afterwards.\n\n"
+            "Revoke a poisoned source and re-evaluate everything it touched, "
+            "transitively, in ONE transaction. Requires the 'admin' scope and "
+            "confirm=true.\n\n"
+            "A fact with no support left once the revoked source's evidence is set "
+            "aside is quarantined (quarantined_fact_ids); a fact ALSO corroborated by "
+            "genuinely independent, non-revoked evidence survives, demoted to "
+            "whatever that remaining evidence actually earns (demoted_fact_ids) — "
+            "over-revocation is as much a bug as under-revocation. Skills citing a "
+            "quarantined fact are quarantined outright. Nothing is deleted: a "
+            "revocation says the evidence should not be trusted, not that the record "
+            "of what happened should vanish. Affected actions are marked "
+            "contaminated, so explain() on them reports it afterwards.\n\n"
             "Call with confirm=false to see the blast radius first."
         ),
     )
@@ -655,6 +661,8 @@ def register_tools(server: Any, runtime: Runtime) -> None:
             "executed": True,
             "revocation_id": str(record.revocation_id),
             "counts": record.radius_manifest.get("counts"),
+            "quarantined_fact_ids": record.radius_manifest.get("quarantined_fact_ids", []),
+            "demoted_fact_ids": record.radius_manifest.get("demoted_fact_ids", []),
             "created_at": _iso(record.created_at),
         }
 

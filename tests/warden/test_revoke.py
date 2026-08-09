@@ -237,6 +237,102 @@ async def test_revoke_source_does_not_touch_unrelated_memory(
     assert str(await db.transaction(tenant, read, label="verify")) == "trusted"
 
 
+async def test_revoke_source_second_order_demotes_survivors_and_quarantines_the_rest(
+    db, engine_for, warden, tenant: uuid.UUID
+) -> None:
+    """PHASE_06 6.5's explicit second-order test, both directions in one
+    revocation: a fact corroborated ONLY by the revoked source (and its
+    descendants) has no support left and is quarantined; a fact ALSO
+    corroborated by two genuinely independent, non-revoked episodes survives
+    — demoted to whatever that remaining evidence actually earns, not wiped
+    out just because it also touched the poisoned source. Over-revocation is
+    as much a bug as under-revocation; this asserts neither happens."""
+    engine = engine_for(tenant)
+    subject = "service:second-order"
+
+    poisoned = await engine.remember(
+        tenant,
+        subject_key=subject,
+        session_id=uuid.uuid4(),
+        event_type="postmortem",
+        content="Poisoned source claim.",
+        source_trust=SourceTrust.EXTERNAL,
+    )
+    clean_a = await engine.remember(
+        tenant,
+        subject_key=subject,
+        session_id=uuid.uuid4(),
+        event_type="incident",
+        content="Independent corroborating report A.",
+        source_trust=SourceTrust.AGENT,
+    )
+    clean_b = await engine.remember(
+        tenant,
+        subject_key=subject,
+        session_id=uuid.uuid4(),
+        event_type="incident",
+        content="Independent corroborating report B.",
+        source_trust=SourceTrust.EXTERNAL,
+    )
+
+    # Only-by-the-poison fact: one provenance edge, to the revoked episode.
+    quarantine_bound = await _fact_from(
+        db, engine, tenant, poisoned.event_id, subject, "claim with no other support"
+    )
+
+    # Genuinely-corroborated fact: an edge to the same poisoned episode, PLUS
+    # two independent (different session, different source_trust) clean ones.
+    survivor = await _fact_from(
+        db,
+        engine,
+        tenant,
+        poisoned.event_id,
+        subject,
+        "claim with real support",
+        trust=Trust.TRUSTED,
+    )
+
+    async def add_edges(cur):
+        for ev in (clean_a.event_id, clean_b.event_id):
+            await cur.execute(
+                "INSERT INTO mnemos.fact_provenance (tenant_id, fact_id, event_id, subject_key) "
+                "VALUES (%s, %s, %s, %s)",
+                (tenant, survivor, ev, subject),
+            )
+
+    await db.transaction(tenant, add_edges, label="add_edges")
+
+    record = await warden.revoke_source(
+        tenant, [poisoned.event_id], actor="test", reason="poisoned corroborator", confirm=True
+    )
+
+    assert str(quarantine_bound) in record.radius_manifest["quarantined_fact_ids"]
+    assert str(survivor) in record.radius_manifest["demoted_fact_ids"]
+    assert str(survivor) not in record.radius_manifest["quarantined_fact_ids"]
+
+    async def read(cur, fact_id):
+        await cur.execute(
+            "SELECT trust, corroboration_count FROM mnemos.semantic_facts "
+            "WHERE tenant_id = %s AND fact_id = %s",
+            (tenant, fact_id),
+        )
+        return await cur.fetchone()
+
+    q_trust, _q_count = await db.transaction(
+        tenant, lambda cur: read(cur, quarantine_bound), label="verify_quarantined", read_only=True
+    )
+    assert str(q_trust) == "quarantined"
+
+    s_trust, s_count = await db.transaction(
+        tenant, lambda cur: read(cur, survivor), label="verify_survivor", read_only=True
+    )
+    assert Trust(s_trust) is Trust.CORROBORATED, (
+        "demoted from TRUSTED, not quarantined — its trusted signature was the "
+        "revoked one, but two genuinely independent sources remain"
+    )
+    assert s_count == 2
+
+
 async def test_preview_revoke_source_touches_nothing(
     db, engine_for, warden, tenant: uuid.UUID
 ) -> None:

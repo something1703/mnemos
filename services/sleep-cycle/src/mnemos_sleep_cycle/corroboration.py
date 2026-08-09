@@ -24,6 +24,13 @@ one cannot, by construction. That is worth the extra query.
 Promotion and demotion are audited state transitions with the evidence that
 justified them (`op='promote'`, `op='quarantine'`), matching the requirement
 that a trust change be as explainable as the fact itself.
+
+The actual counting algorithm (`max_independent_corroborations`) and the
+promotion rule (`determine_trust`) now live in `mnemos_engine.corroboration`,
+re-exported here, because `mnemos_warden.revoke` needs the identical
+arithmetic to demote a fact's corroboration when one of its sources turns out
+to be poisoned — see that module's docstring for why a second copy would be
+dangerous.
 """
 
 from __future__ import annotations
@@ -33,6 +40,11 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 import psycopg
+from mnemos_engine.corroboration import determine_trust as determine_trust
+from mnemos_engine.corroboration import independent_corroboration as _independent_corroboration
+from mnemos_engine.corroboration import (
+    max_independent_corroborations as _max_independent_corroborations,
+)
 from mnemos_engine.ledger import append_audit
 from mnemos_engine.models import Op, Trust
 
@@ -46,97 +58,17 @@ accumulate as ambient noise an agent might stumble into via
 `include_unverified=True`."""
 
 
-_TRUST_CATEGORIES = ("system", "operator", "agent", "external")
-
-
-def _max_independent_corroborations(signatures: set[tuple[UUID, str]]) -> int:
-    """The size of the largest set of provenance signatures that are pairwise
-    independent — every pair differing in BOTH session_id and source_trust.
-
-    Counting *distinct* `(session_id, source_trust)` pairs is not the same
-    thing and would overcount: two signatures from the same session but
-    different source_trust values (a session with a mixed-trust episode list)
-    share a session and so are not independent of each other under the
-    "different session AND different source_trust" rule, even though they are
-    literally two distinct pairs.
-
-    This is exactly maximum bipartite matching — sessions on one side,
-    source-trust categories on the other, an edge wherever a session
-    contributed that category at least once — solved with a plain augmenting-
-    path search. That is not overkill here: there are at most four categories,
-    so the whole computation is O(sessions x 4), and this function is the one
-    place the corroboration gate's stated definition ("different session AND
-    different source_trust origin") gets turned into an actual number. A
-    sloppier approximation here is exactly how a memory-poisoning defense
-    quietly stops meaning what it claims to mean.
-    """
-    sessions: dict[UUID, set[str]] = {}
-    for session_id, trust in signatures:
-        sessions.setdefault(session_id, set()).add(trust)
-
-    match_to_session: dict[str, UUID] = {}
-
-    def try_assign(session_id: UUID, seen: set[str]) -> bool:
-        for trust in sessions[session_id]:
-            if trust in seen:
-                continue
-            seen.add(trust)
-            if trust not in match_to_session or try_assign(match_to_session[trust], seen):
-                match_to_session[trust] = session_id
-                return True
-        return False
-
-    matched = 0
-    for session_id in sessions:
-        if try_assign(session_id, set()):
-            matched += 1
-    return matched
-
-
 async def recompute_corroboration(
     cur: psycopg.AsyncCursor, tenant_id: UUID, fact_id: UUID
 ) -> tuple[int, bool]:
     """Recount independent corroborating sources from the provenance graph.
 
-    Returns `(corroboration_count, has_trusted_source)`. Does not write
-    anything — callers combine this with `determine_trust` and are responsible
-    for arming an audit ticket before whatever UPDATE follows, exactly like
-    every other protected-table mutation in this codebase.
+    Returns `(corroboration_count, has_trusted_source)`. Thin wrapper over
+    `mnemos_engine.corroboration.independent_corroboration` kept here under
+    its original name because callers in this package (and its tests) already
+    know it by this name; the shared implementation is what actually runs.
     """
-    await cur.execute(
-        """
-        SELECT DISTINCT e.session_id, e.source_trust
-        FROM mnemos.fact_provenance p
-        JOIN mnemos.episodic_events e
-          ON e.tenant_id = p.tenant_id AND e.event_id = p.event_id
-        WHERE p.tenant_id = %s AND p.fact_id = %s
-        """,
-        (tenant_id, fact_id),
-    )
-    signatures = {(row[0], str(row[1])) for row in await cur.fetchall()}
-    count = _max_independent_corroborations(signatures)
-    has_trusted_source = any(trust in ("system", "operator") for _session, trust in signatures)
-    return count, has_trusted_source
-
-
-def determine_trust(current: Trust, *, corroboration_count: int, has_trusted_source: bool) -> Trust:
-    """The promotion rule, as a pure function so it can be tested without a
-    database: system/operator provenance promotes directly; two independent
-    sources promote to corroborated; anything else holds.
-
-    CONTESTED and QUARANTINED never move via this function — both need an
-    explicit resolution (a human, a supersession, or a fresh TTL window), not
-    a corroboration count alone. A quarantined fact accumulating two more
-    signatures from the SAME attacker-controlled pipeline should not walk
-    itself back to legitimacy on volume.
-    """
-    if current in (Trust.CONTESTED, Trust.QUARANTINED):
-        return current
-    if has_trusted_source:
-        return Trust.TRUSTED
-    if corroboration_count >= 2:
-        return Trust.CORROBORATED
-    return Trust.UNVERIFIED
+    return await _independent_corroboration(cur, tenant_id, fact_id)
 
 
 async def apply_trust_transition(
@@ -285,6 +217,7 @@ async def quarantine_stale_unverified(
 
 __all__ = [
     "DEFAULT_TTL_DAYS",
+    "_max_independent_corroborations",
     "apply_trust_transition",
     "determine_trust",
     "quarantine_stale_unverified",
