@@ -69,6 +69,12 @@ SERVICE_ROLES = (
         role="mnemos_pipeline", login="mnemos_pipeline_svc", login_attributes=("BYPASSRLS",)
     ),
     ServiceRole(role="mnemos_warden", login="mnemos_warden_svc"),
+    # The Custodian's own direct connection (custodian_runs/custodian_findings/
+    # governance_proposals bookkeeping, migration 011) — no BYPASSRLS, no
+    # DELETE anywhere; it never touches memory tables directly at all (Phase
+    # 07.4's make no-warden-in-custodian is the structural half of that
+    # claim, this is the database-grant half).
+    ServiceRole(role="mnemos_readonly", login="mnemos_readonly_svc"),
 )
 
 

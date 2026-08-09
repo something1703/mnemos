@@ -32,6 +32,9 @@ dependencies = [
 # skills' references/ files. It may propose governance actions; it may never
 # execute one (Phase 07.4).
 
+[project.scripts]
+mnemos-custodian = "mnemos_custodian.cli:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
