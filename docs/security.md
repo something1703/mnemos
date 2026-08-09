@@ -151,6 +151,12 @@ five that matter most for a security review:
   `mnemos_custodian.allowlist` plus `CustodianMcpClient.call_tool()`'s own
   refusal to invoke a write-capable tool by name, both tested — not the
   account's own privileges. `docs/limits.md` §The Custodian's credential.
+- **The Custodian does not use the `ccloud` CLI, despite PHASE_07 7.5's
+  design.** That binary is OAuth-only — no non-interactive, service-account
+  login mode exists, confirmed by running it. Control-plane facts (backup
+  recency) come from the same underlying REST API instead, called directly
+  with the same Bearer token already used for the MCP server. `docs/
+  limits.md` §`ccloud` CLI cannot run non-interactively.
 - **Dual control proves a second key, not a second human** (§2 above).
 - **What has not been executed yet, stated plainly:** adversarial
   red-teaming (Phase 10) and load/scale measurement (Phase 11) have not run

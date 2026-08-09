@@ -237,6 +237,44 @@ says so rather than implying otherwise.
 
 ---
 
+## `ccloud` CLI cannot run non-interactively
+
+PHASE_07_CUSTODIAN.md 7.5 calls for the Custodian to "shell out to `ccloud`
+with a scoped service account" for control-plane facts the MCP server
+cannot provide (backup recency, region topology, cluster inventory).
+Installed and inspected directly (`ccloud` v0.8.23, 2026-08-09): the binary
+has exactly one authentication path, `ccloud auth login`, which opens a
+browser and requires a human to paste back an authorization code
+(confirmed by actually running it: it prints a URL and blocks on stdin for
+the code). No `--api-key` flag, no documented environment variable, and the
+binary's own strings show only the browser-login code path
+(`ServeBrowserLoginServer`, `requestToken`) — there is no non-interactive
+service-account login mode in this CLI. A Fargate task has no browser and
+no human present when a scheduled sweep runs at 3am; this CLI cannot
+authenticate there as shipped.
+
+**What was built instead:** `mnemos_custodian.cloud_api.CloudApiClient`
+calls the CockroachDB Cloud REST API directly (`GET /api/v1/clusters/
+{cluster_id}/backups-config`, `GET /api/v1/clusters/{cluster_id}/backups`),
+confirmed from the API's own published OpenAPI spec
+(`https://cockroachlabs.cloud/assets/docs/api/latest/openapi.json`) to use
+simple Bearer-token auth — the same service-account key already used for
+the Cloud MCP server, verified live against the real `mnemos` cluster. Same
+data (the `ccloud` CLI is itself a thin wrapper over this same API), same
+credential, same deployability story as `mcp_client.py`. `custodian_findings
+.tool_source = 'ccloud'` (migration 008's own naming) still means "control-
+plane facts distinct from the MCP server's SQL-shaped ones," not "produced
+by the literal `ccloud` binary" — worth knowing if a reader goes looking for
+the binary in the deployed container and does not find it.
+
+Region topology and cluster inventory are not separately re-implemented
+here: `mcp_client.py`'s `get_cluster`/`list_clusters` tools already return
+the same `regions` data this REST endpoint would. The one genuinely new
+capability this section adds is backup recency
+(`check_backup_recency`) — the concrete example PHASE_07 7.5 itself names.
+
+---
+
 ## Tenant isolation
 
 **RLS defends against our bugs, not against a hostile SQL session.** Policies key

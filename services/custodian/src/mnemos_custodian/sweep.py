@@ -38,6 +38,7 @@ import psycopg
 from mnemos_engine.llm import ChatClient, LLMError
 
 from . import allowlist, findings
+from .cloud_api import CloudApiClient, backup_recency_finding
 from .mcp_client import CustodianMcpClient
 from .skills import Skill
 
@@ -185,6 +186,7 @@ async def run_sweep(
     fact_writer: FactWriter,
     session_id: UUID,
     database: str,
+    cloud_api: CloudApiClient | None = None,
 ) -> UUID:
     """One full sweep across every given skill. Returns the run_id.
 
@@ -193,6 +195,11 @@ async def run_sweep(
     partial, honestly-labeled coverage, which is worse. `finish_run`'s
     `status` reflects this: PARTIAL when anything was skipped, SUCCEEDED
     only when nothing was.
+
+    `cloud_api` is optional — PHASE_07 7.5's control-plane facts (currently:
+    backup recency) on top of the MCP-sourced findings above. `None` skips
+    it cleanly rather than requiring every caller (including every test in
+    `tests/custodian/test_sweep.py` that predates 7.5) to provide one.
     """
     run_id = await findings.start_run(
         cur, tenant_id, trigger_source=trigger_source, trigger_detail=trigger_detail
@@ -224,6 +231,18 @@ async def run_sweep(
             continue
 
         all_drafts.extend(await _interpret(chat, skill, tool_results))
+
+    if cloud_api is not None:
+        try:
+            backup_finding = await backup_recency_finding(cloud_api)
+        except Exception as exc:
+            checks_skipped += 1
+            skipped_detail.setdefault("cloud_api", []).append(f"backup_recency: {exc}")
+            log.info("skipped cloud_api backup recency check: %s", exc)
+        else:
+            checks_run += 1
+            if backup_finding is not None:
+                all_drafts.append(backup_finding)
 
     persisted: list[findings.Finding] = []
     for draft in all_drafts:

@@ -45,6 +45,22 @@ def _one_skill(skill_id: str = "triaging-live-sql-activity") -> dict[str, Skill]
     }
 
 
+class _StubCloudApiClient:
+    """Duck-types `mnemos_custodian.cloud_api.CloudApiClient`'s two methods
+    — `backup_recency_finding()` only ever calls these, so a real HTTP
+    client is not needed to test `run_sweep`'s integration of it."""
+
+    def __init__(self, *, backup_config: dict, latest_backup: dict | None) -> None:
+        self._config = backup_config
+        self._latest = latest_backup
+
+    async def backup_config(self) -> dict:
+        return self._config
+
+    async def latest_backup(self) -> dict | None:
+        return self._latest
+
+
 async def test_sweep_persists_a_run_and_its_findings(db, tenant: uuid.UUID) -> None:
     chat = ScriptedChat(
         [
@@ -262,3 +278,104 @@ async def test_unreachable_tool_is_skipped_and_counted_not_silently_dropped(
     assert checks_skipped == 2
     assert "cockroachdb-sql" in skipped_detail
     assert len(skipped_detail["cockroachdb-sql"]) == 2
+
+
+async def test_sweep_includes_a_ccloud_sourced_finding_when_cloud_api_is_given(
+    db, tenant: uuid.UUID
+) -> None:
+    """PHASE_07 7.5's acceptance criterion: a sweep produces at least one
+    finding sourced from ccloud (here: the REST API pivot,
+    docs/limits.md's "ccloud CLI cannot run non-interactively") and one
+    from the MCP server, distinguishable by tool_source."""
+    server = _fake_cloud_mcp_server()
+    chat = ScriptedChat([{"findings": []}])  # no MCP-sourced findings this sweep
+    fact_writer = StubFactWriter()
+    stale_backup = {
+        "id": "old",
+        "as_of_time": "2020-01-01T00:00:00Z",  # ancient — definitely stale
+    }
+    cloud_api = _StubCloudApiClient(
+        backup_config={"enabled": True, "frequency_minutes": 60, "retention_days": 7},
+        latest_backup=stale_backup,
+    )
+
+    async def run(cur):
+        async with CustodianMcpClient(server) as mcp:
+            return await run_sweep(
+                cur,
+                tenant,
+                trigger_source=TriggerSource.SCHEDULE,
+                trigger_detail=None,
+                skills=_one_skill(),
+                mcp=mcp,
+                chat=chat,
+                fact_writer=fact_writer,
+                session_id=uuid.uuid4(),
+                database="mnemos",
+                cloud_api=cloud_api,
+            )
+
+    run_id = await db.transaction(tenant, run, label="sweep")
+
+    async def read_findings(cur):
+        await cur.execute(
+            "SELECT severity, tool_source, summary FROM mnemos.custodian_findings "
+            "WHERE tenant_id = %s AND run_id = %s",
+            (tenant, run_id),
+        )
+        return await cur.fetchall()
+
+    rows = await db.transaction(tenant, read_findings, label="read_findings", read_only=True)
+    assert len(rows) == 1
+    assert rows[0][0] == "critical"
+    assert rows[0][1] == "ccloud"
+    assert "rpo" in rows[0][2].lower()
+
+    # Critical is promotable — it must have gone through the fact writer too.
+    assert len(fact_writer.remembered) == 1
+
+
+async def test_sweep_skips_and_counts_a_failing_cloud_api_check(db, tenant: uuid.UUID) -> None:
+    server = _fake_cloud_mcp_server()
+    chat = ScriptedChat([{"findings": []}])
+    fact_writer = StubFactWriter()
+
+    class _FailingCloudApiClient:
+        async def backup_config(self) -> dict:
+            raise RuntimeError("connection refused")
+
+        async def latest_backup(self) -> dict | None:
+            raise AssertionError("must not be reached")  # pragma: no cover
+
+    async def run(cur):
+        async with CustodianMcpClient(server) as mcp:
+            return await run_sweep(
+                cur,
+                tenant,
+                trigger_source=TriggerSource.SCHEDULE,
+                trigger_detail=None,
+                skills=_one_skill(),
+                mcp=mcp,
+                chat=chat,
+                fact_writer=fact_writer,
+                session_id=uuid.uuid4(),
+                database="mnemos",
+                cloud_api=_FailingCloudApiClient(),
+            )
+
+    run_id = await db.transaction(tenant, run, label="sweep")
+
+    async def read_run(cur):
+        await cur.execute(
+            "SELECT status, checks_skipped, skipped_detail FROM mnemos.custodian_runs "
+            "WHERE tenant_id = %s AND run_id = %s",
+            (tenant, run_id),
+        )
+        return await cur.fetchone()
+
+    status, checks_skipped, skipped_detail = await db.transaction(
+        tenant, read_run, label="read_run", read_only=True
+    )
+    assert status == str(RunStatus.PARTIAL)
+    assert checks_skipped == 1
+    assert "cloud_api" in skipped_detail
