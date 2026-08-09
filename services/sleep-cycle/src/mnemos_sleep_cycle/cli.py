@@ -1,18 +1,26 @@
 """`mnemos-sleep-cycle` — consolidate episodes into facts, decay what has gone
-unused, quarantine what never earned corroboration.
+unused, quarantine what never earned corroboration, checkpoint the ledger.
 
     mnemos-sleep-cycle posture
     mnemos-sleep-cycle run-consolidation [--limit N]
     mnemos-sleep-cycle run-decay
-    mnemos-sleep-cycle run-cycle           # both, in sequence
+    mnemos-sleep-cycle run-checkpoint
+    mnemos-sleep-cycle run-cycle           # consolidation, then checkpoint
 
 `run-consolidation` is the hourly light run and the nightly full run — the
 only difference between them is `--limit`, matching Phase 05.6's design
 (hourly capped at a handful of sessions, nightly given the full backlog).
-`run-decay` is the weekly sweep. `run-cycle` exists for a single Lambda
-invocation to drive the whole nightly path without needing Step Functions to
-orchestrate two separate function calls, and is what the state machine's
-Task states actually invoke (see infra/sleep-cycle/state_machine.json).
+`run-decay` is the weekly sweep. `run-checkpoint` binds every shard head into
+one Merkle root per tenant (`mnemos_engine.ledger.checkpoint`) — the input
+`mnemos-attest anchor` commits to S3 Object Lock.
+
+`run-cycle` and the individual `run-*` commands are both real entry points,
+not one wrapping the other for show: `infra/sleep-cycle/state_machine.json`
+invokes this Lambda per-stage (`{"stage": "consolidate"}`, `{"stage":
+"checkpoint"}`) so Step Functions gets its own retry and visible execution
+history per stage, while `run-cycle` exists for a single manual or
+EventBridge-direct invocation that wants the whole nightly path in one
+process without Step Functions in the loop at all.
 """
 
 from __future__ import annotations
@@ -24,7 +32,9 @@ import sys
 from uuid import UUID
 
 import psycopg
+from mnemos_engine.ledger import checkpoint as ledger_checkpoint
 from mnemos_engine.llm import LLMError
+from mnemos_engine.models import Checkpoint
 
 from .consolidate import (
     ConsolidationOutcome,
@@ -160,6 +170,48 @@ async def run_decay(runtime: Runtime) -> dict[str, int]:
     return totals
 
 
+async def run_checkpoint(runtime: Runtime) -> dict[str, int]:
+    """The reusable core of `run-checkpoint`: one Merkle root per tenant.
+
+    A tenant with an empty chain (never written to) is skipped rather than
+    checkpointing zero shards — `ledger.checkpoint` would happily produce one,
+    but a root over nothing is not evidence of anything and would just be a
+    checkpoint `mnemos-attest anchor` has to explain away later.
+    """
+
+    async def list_tenants(cur: psycopg.AsyncCursor) -> list[tuple[UUID, str]]:
+        await cur.execute("SELECT tenant_id, slug FROM mnemos.tenants")
+        return [(row[0], str(row[1])) for row in await cur.fetchall()]
+
+    tenants = await runtime.db.transaction(None, list_tenants, label="list_tenants", read_only=True)
+
+    checkpointed = 0
+    skipped = 0
+    for tenant_id, slug in tenants:
+
+        async def has_chain(cur: psycopg.AsyncCursor, tenant_id: UUID = tenant_id) -> bool:
+            await cur.execute(
+                "SELECT 1 FROM mnemos.chain_heads WHERE tenant_id = %s LIMIT 1", (tenant_id,)
+            )
+            return await cur.fetchone() is not None
+
+        if not await runtime.db.transaction(
+            tenant_id, has_chain, label="has_chain", read_only=True
+        ):
+            skipped += 1
+            continue
+
+        async def run(cur: psycopg.AsyncCursor, tenant_id: UUID = tenant_id) -> Checkpoint:
+            return await ledger_checkpoint(cur, tenant_id, actor=ACTOR)
+
+        result = await runtime.db.transaction(tenant_id, run, label="checkpoint")
+        checkpointed += 1
+        print(f"  {slug}: checkpoint {result.checkpoint_seq} — {result.entry_count} entries")
+
+    print(f"totals: checkpointed={checkpointed} skipped={skipped}")
+    return {"checkpointed": checkpointed, "skipped": skipped}
+
+
 async def _cmd_consolidate(limit: int | None) -> int:
     runtime = await build_runtime()
     try:
@@ -178,13 +230,22 @@ async def _cmd_decay() -> int:
     return EXIT_OK
 
 
+async def _cmd_checkpoint() -> int:
+    runtime = await build_runtime()
+    try:
+        await run_checkpoint(runtime)
+    finally:
+        await runtime.close()
+    return EXIT_OK
+
+
 async def _cmd_cycle() -> int:
     runtime = await build_runtime()
     try:
         print("== consolidation ==")
         await run_consolidation(runtime)
-        print("\n== decay ==")
-        await run_decay(runtime)
+        print("\n== checkpoint ==")
+        await run_checkpoint(runtime)
     finally:
         await runtime.close()
     return EXIT_OK
@@ -205,7 +266,8 @@ def main() -> int:
     )
 
     sub.add_parser("run-decay", help="strength decay + stale-unverified quarantine, all tenants")
-    sub.add_parser("run-cycle", help="consolidation then decay, in one process")
+    sub.add_parser("run-checkpoint", help="one Merkle checkpoint per tenant with a non-empty chain")
+    sub.add_parser("run-cycle", help="consolidation then checkpoint, in one process")
 
     args = parser.parse_args()
 
@@ -216,6 +278,8 @@ def main() -> int:
             return asyncio.run(_cmd_consolidate(args.limit))
         if args.command == "run-decay":
             return asyncio.run(_cmd_decay())
+        if args.command == "run-checkpoint":
+            return asyncio.run(_cmd_checkpoint())
         return asyncio.run(_cmd_cycle())
     except KeyboardInterrupt:
         return 130

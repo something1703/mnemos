@@ -52,12 +52,27 @@ def _provision_role_users(admin_conn: psycopg.Connection) -> None:
 
     The local cluster runs insecure, so no password is needed to connect — which
     keeps credentials out of the test suite entirely.
+
+    `mnemos_pipeline` carries `BYPASSRLS` (migration 011), but that attribute
+    does NOT propagate through `GRANT role TO user` the way ordinary table
+    privileges do — CockroachDB matches real PostgreSQL semantics here, where
+    LOGIN/SUPERUSER/BYPASSRLS/CREATEDB/CREATEROLE are attributes of the role
+    itself, not privileges inherited via membership. A login granted only
+    `mnemos_pipeline` sees zero rows on any cross-tenant query and fails
+    silently — no error, just an empty result that reads as "nothing to do"
+    instead of "wrong permissions". Found against the real deployed pipeline
+    role, not in this suite (nothing here happened to run a cross-tenant query
+    as this specific login), which is exactly why it is granted directly here
+    too, alongside the regression test in test_deployment_surface.py::
+    test_pipeline_role_bypasses_rls_directly_not_only_via_membership.
     """
     with admin_conn.cursor() as cur:
         for role, user in ROLE_USERS.items():
             cur.execute(f"CREATE USER IF NOT EXISTS {user}")
             cur.execute(f"GRANT {role} TO {user}")
             cur.execute(f"GRANT CONNECT ON DATABASE mnemos TO {user}")
+            if role == "mnemos_pipeline":
+                cur.execute(f"ALTER USER {user} BYPASSRLS")
 
 
 @pytest.fixture
