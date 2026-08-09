@@ -81,13 +81,31 @@ no-model-in-warden: ## Invariant 1, statically: the Warden may not import an LLM
 		|| { echo "FAIL: Bedrock client constructed inside the Warden (invariant 1)"; exit 1; }
 	@echo "OK: no model dependency in the Warden"
 
+.PHONY: no-warden-in-custodian
+no-warden-in-custodian: ## Phase 07.4, statically: the Custodian may propose, never execute
+	@# "The agent can ask; only a person can answer" — proposals.py's own claim
+	@# that it can INSERT a governance_proposals row and nothing else holds
+	@# structurally only if mnemos_custodian cannot reach mnemos_warden at all,
+	@# not merely by convention. Same reasoning as no-model-in-warden: a grep
+	@# over imports, not a runtime check.
+	@! grep -rnE "^[[:space:]]*(import|from)[[:space:]]+mnemos_warden" \
+		services/custodian --include='*.py' 2>/dev/null \
+		|| { echo "FAIL: services/custodian imports mnemos_warden (Phase 07.4)"; exit 1; }
+	@# Anchored to a quoted dependency-list entry, not a bare substring match,
+	@# so prose explaining why some OTHER package needs mnemos-warden (as
+	@# services/custodian's own pyproject.toml does, contrasting itself with
+	@# services/api) does not trip this the way a naive grep would.
+	@! grep -nE '^\s*"mnemos-warden' services/custodian/pyproject.toml 2>/dev/null \
+		|| { echo "FAIL: services/custodian depends on mnemos-warden (Phase 07.4)"; exit 1; }
+	@echo "OK: the Custodian cannot reach the Warden"
+
 .PHONY: secrets
 secrets: ## gitleaks over the full history
 	@command -v gitleaks >/dev/null || { echo "install gitleaks: brew install gitleaks"; exit 1; }
 	gitleaks detect --no-banner --redact
 
 .PHONY: check
-check: lint typecheck test no-delete-in-engine no-model-in-warden ## Everything CI runs
+check: lint typecheck test no-delete-in-engine no-model-in-warden no-warden-in-custodian ## Everything CI runs
 
 # ---------------------------------------------------------------------------
 # Database

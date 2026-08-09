@@ -20,8 +20,9 @@ dependencies = [
     # `mcp>=2.0` requires httpx2, its own fork of httpx, NOT plain httpx —
     # streamable_http_client's http_client= param is typed against
     # httpx2.AsyncClient specifically, so that is what mcp_client.py
-    # constructs. Named explicitly for the same reason services/api names
-    # boto3 explicitly despite it arriving transitively via mnemos-warden.
+    # constructs. Named explicitly even though it already arrives
+    # transitively via `mcp`, same reasoning as services/api naming boto3
+    # explicitly despite it arriving via mnemos-warden there.
     "httpx2>=2.5.0",
 ]
 
