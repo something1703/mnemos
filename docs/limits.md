@@ -38,6 +38,30 @@ backup- and MVCC-resident ciphertext permanently unreadable. This is the only
 mode that closes the backup path, and Phase 10.5 tests it by restoring a real
 backup of a shredded tenant.
 
+**Not yet true of the deployed API Lambda, stated plainly (found 2026-08-09):**
+`KmsKeyProvider` — real per-tenant CMKs, real `ScheduleKeyDeletion` with AWS's
+mandatory 7-day pending window — is fully implemented and 100%-covered by
+`tests/warden/test_keys_kms.py`, and three real CMKs are provisioned and
+granted to the API Lambda's IAM role (`infra/api/exec-policy.json`'s
+`EnvelopeEncryptionPerTenantCmk` statement, one ARN per demo tenant). But
+`services/api/src/mnemos_api/runtime.py::build_runtime()` unconditionally
+constructs `LocalKeyProvider()` and a single tenant-agnostic
+`Envelope(LocalKeyWrapper())` shared across every request — it never reads
+the `MNEMOS_KMS_KEY_ARN_CLINIC`/`_OPS`/`_FINANCE` env vars `.env.example`
+documents, and never constructs a `KmsKeyProvider`. `shred` against the
+deployed API today destroys an in-memory local key that resets on the next
+cold start, not a durable AWS key — a materially weaker guarantee than the
+`KmsKeyProvider` table above describes, on infrastructure that already exists
+to close this gap. Wiring it requires more than swapping `LocalKeyProvider`
+for `KmsKeyProvider`: `Envelope`'s `KeyWrapper` protocol wraps/unwraps for
+*one* key, chosen when the `Envelope` is constructed, and `runtime.py` builds
+exactly one `MnemosEngine` shared across every tenant's requests — genuine
+per-tenant CMKs need either a per-tenant engine cache (the pattern
+`tests/warden/conftest.py::_LiveKeyWrapper` already uses, per-test, but never
+ported to production) or a tenant-aware `wrap`/`unwrap` call, neither of
+which is a small change. Tracked, not silently left for a reader to discover
+by diffing the IAM policy against the code.
+
 **Embeddings leak.** A 1024-dimension embedding is a lossy but non-zero encoding
 of its source text; inversion attacks against embeddings are an active research
 area. This is exactly why erasure must delete vectors in the same transaction as
@@ -124,6 +148,50 @@ and deliberately not worked around. `is_destroyed()` means "deletion has been
 scheduled and the key can no longer be used", not "the key material is
 already gone" — those are different instants, 7 days apart, and both matter
 depending on which claim you are checking.
+
+---
+
+## Deployment topology
+
+**The Warden is a library running inside the API Lambda, not a separate
+service.** PHASE_06_GOVERNANCE_WARDEN.md's sub-phase 6.1 calls for
+`services/warden`: its own Lambda, its own IAM role, and — critically — the
+*only* role in the account holding `kms:ScheduleKeyDeletion` and reaching the
+database's DELETE-capable login. That service does not exist; `services/warden`
+was never created. What exists instead, and is real: two separate CockroachDB
+roles (`mnemos_api` with no DELETE anywhere, `mnemos_warden` with it,
+migration 011) and two separate `Database` connections inside the ONE Lambda
+process (`Runtime.db` / `Runtime.warden_db`, gated by an admin-scope check
+before the privileged one is ever touched).
+
+**What this does and does not buy.** Two roles at the database layer means a
+SQL-injection-shaped bug in an ordinary read/write path cannot reach DELETE —
+that boundary is real, tested (`tests/invariants/test_invariant_1_privileges.py`),
+and would hold even under a compromised query. What it does not provide: if
+an attacker achieves arbitrary code execution *inside the Lambda process
+itself* (a dependency vulnerability, a deserialization bug, a supply-chain
+compromise), they inherit both database connections and both sets of
+credentials, because both live in the same process's memory and the same
+IAM role's environment. A genuinely separate Warden Lambda would put an IAM
+boundary between "compromise the code that talks to agents" and "hold the
+one credential that can destroy anything" — the same reasoning ADR-002 gives
+for splitting the Warden out of the Fabric in the first place, just not
+carried all the way to the process boundary.
+
+**Why this is written up rather than fixed here (assessed 2026-08-09):** the
+application code is already structured for the swap — `services/api`
+touches the Warden exclusively through `Runtime.warden`'s stable method
+interface (`forget`, `shred`, `revoke_source`, ...), so a `RemoteWarden`
+adapter that calls a separate Lambda via `lambda:InvokeFunction` instead of
+running `packages/warden.Warden` in-process would not require touching
+`tools.py` at all. What is missing is genuinely new infrastructure, not a
+refactor: a new Lambda function and container image, a new IAM role and
+policy (KMS `ScheduleKeyDeletion` + the `mnemos_warden` DB login, and nothing
+else), removing any equivalent reach from the API role, and redeploying —
+comparable in size to the sleep-cycle Lambda's own deployment work earlier in
+this build. Worth doing; not done in this pass, in favor of the entirely
+unbuilt work (the Custodian, Phases 07 onward) that this project's remaining
+time is better spent on.
 
 ---
 

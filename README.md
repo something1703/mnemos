@@ -188,11 +188,14 @@ Three verticals run as three tenants on one fabric —
 The full version is [docs/limits.md](docs/limits.md). The short version:
 
 - The hash chain proves a deletion was **recorded and unmodified** — not that
-  every byte is gone. `shred` mode destroys the tenant's real AWS KMS key
-  (three per-tenant CMKs, provisioned 2026-08-08) so backup- and
-  MVCC-resident ciphertext becomes unreadable; that is the mode that closes
-  the gap. Tested against real KMS; **not yet** against a real restored
-  backup — that drill is Phase 11, not done.
+  every byte is gone. `shred` mode is designed to destroy the tenant's real
+  AWS KMS key (three per-tenant CMKs, provisioned 2026-08-08) so backup- and
+  MVCC-resident ciphertext becomes unreadable; that is the mode meant to
+  close the gap, and the KMS-calling code is tested against real KMS
+  semantics. **Not yet wired into the deployed API** as of this writing —
+  the running service uses an in-memory key today, not the provisioned CMKs
+  — and **not yet tested** against a real restored backup either; both are
+  open, tracked in `docs/limits.md`, not done.
 - Ledger tampering by an attacker with database DML rights — including one
   who rewrites both the audit chain **and** the checkpoint row that describes
   it, consistently — is caught by comparing the live chain against a Merkle

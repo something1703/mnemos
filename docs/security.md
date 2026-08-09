@@ -127,10 +127,20 @@ five that matter most for a security review:
   Cloud Basic cluster by default. `recall_as_of()` raises a typed
   `OutsideTemporalWindow` error carrying the real boundary rather than
   silently answering from `now()`.
-- **Backups survive `forget`; only `shred` closes that path,** by destroying
-  the tenant's KMS data key (`KmsKeyProvider.destroy()`, a real
+- **Backups survive `forget`; `shred` is designed to close that path** by
+  destroying the tenant's KMS data key (`KmsKeyProvider.destroy()`, a real
   `ScheduleKeyDeletion` call with AWS's mandatory 7-day pending window — not
-  worked around).
+  worked around) — but the deployed API Lambda does not construct a
+  `KmsKeyProvider` at all as of this writing; it uses an in-memory local key
+  that resets on cold start. The class is real and 100%-tested; the wiring
+  from the already-provisioned per-tenant CMKs into `runtime.py` is not done.
+  Full detail: `docs/limits.md` §Erasure.
+- **The Warden runs inside the API Lambda, not as its own service.** Two
+  database roles give real privilege separation against a SQL-injection-shaped
+  bug; they do not protect against arbitrary code execution in the Lambda
+  process itself, which would inherit both roles' credentials. A separate
+  Warden Lambda with its own IAM role (PHASE_06 6.1's original design) closes
+  that gap and has not been built. `docs/limits.md` §Deployment topology.
 - **Dual control proves a second key, not a second human** (§2 above).
 - **What has not been executed yet, stated plainly:** adversarial
   red-teaming (Phase 10) and load/scale measurement (Phase 11) have not run

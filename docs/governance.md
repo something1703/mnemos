@@ -59,6 +59,12 @@ change.
 | `quarantine` | Everything retained, revoked from recall | **Yes** |
 | `shred` | `forget`, plus the tenant's KMS data key is destroyed (`ScheduleKeyDeletion`, AWS's mandatory 7-day pending window — not worked around) | No, and **tenant-wide**: every row this tenant has ever written becomes unrecoverable, not just this subject's |
 
+The KMS key destruction row describes `KmsKeyProvider` as built and tested —
+it is not yet what the deployed API Lambda actually uses (`docs/limits.md`
+§Erasure has the honest version: the running service constructs
+`LocalKeyProvider` unconditionally, so `shred` there destroys an in-memory
+key, not a durable AWS one, as of this writing).
+
 Every mode's preview (`preview_erasure`) runs the **same counting query** the
 execution does — not a second query that is merely supposed to agree — so
 there is no gap between what a caller was shown and what was actually
