@@ -27,6 +27,7 @@ from mnemos_engine.crypto import Envelope, LocalKeyWrapper
 from mnemos_engine.db import Database
 from mnemos_engine.embeddings import Embedder, FakeEmbedder, OpenAIEmbedder
 from mnemos_engine.engine import MnemosEngine
+from mnemos_warden.guarantees import assert_no_model_loaded
 from mnemos_warden.keys import KeyProvider, LocalKeyProvider
 from mnemos_warden.warden import Warden
 
@@ -221,6 +222,28 @@ async def build_runtime(settings: Settings | None = None) -> Runtime:
         region=settings.region,
     )
     warden = Warden(warden_db, key_provider=key_provider)
+
+    # The third of the no-model guarantee's three checks (the other two are
+    # `make no-model-in-warden`'s static scan, at commit time, and the
+    # deployed IAM role's Bedrock deny, at the AWS boundary). This one runs
+    # here, in-process, at the moment the Warden object actually exists —
+    # not merely "before Warden code runs" but "before this Runtime is handed
+    # back to anything that could route a request to it".
+    #
+    # Its blind spot, stated rather than hidden: it inspects `sys.modules`
+    # for an imported LLM SDK, and this process's own OpenAIEmbedder/
+    # OpenAIChatClient (packages/engine) are deliberately hand-rolled over
+    # `urllib` rather than the `openai` package specifically so that
+    # dependency stays out of the Warden's own import graph — which also
+    # means this check cannot see a raw HTTP call to a model endpoint made by
+    # code elsewhere in the SAME process. It catches an SDK creeping into the
+    # dependency tree; it does not by itself prove OS-level process isolation,
+    # which today does not exist (see docs/security.md's honest limits
+    # section) — the Warden's own methods never call the engine's model
+    # clients, checked and enforced at the code-path level, not the process
+    # level.
+    assert_no_model_loaded()
+
     db_posture = await _probe_posture(db, warden_db)
 
     return Runtime(

@@ -82,7 +82,12 @@ async def test_pipeline_role_sees_unconsolidated_episodes_across_tenants(
     await db.transaction(tenant, write_with_audit, label="write_episode")
 
     async def gather(cur: psycopg.AsyncCursor) -> list:
-        return await find_unconsolidated_batches(cur, limit=1000)
+        # Ordered oldest-first, so a large limit is what keeps this test
+        # correct on a long-lived local dev cluster with a real backlog —
+        # not just a freshly migrated one. A fresh CI run never accumulates
+        # enough rows for this to matter; a laptop that has run the suite a
+        # few hundred times in one day genuinely can.
+        return await find_unconsolidated_batches(cur, limit=50_000)
 
     batches = await pipeline_db.transaction(None, gather, label="find_batches", read_only=True)
     matching = [b for b in batches if b.tenant_id == tenant and b.subject_key == subject]
