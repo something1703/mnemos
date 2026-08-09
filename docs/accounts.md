@@ -35,7 +35,7 @@ a service-account key.
 | Principal | Mode | Notes |
 |---|---|---|
 | Development OAuth session | **write-capable** | ADR-012. Used read-only in practice; schema changes go through versioned migrations, never `create_table` over MCP |
-| Custodian service account | read-only | Phase 07. Not yet created. Startup probe hard-fails if any write tool is reachable |
+| Custodian service account (`mnemos-custodian2`) | **write-capable** (Cluster Admin) | Phase 07. Created 2026-08-09. Genuinely read-only is not achievable via any Cloud IAM role for this integration — see `docs/limits.md` "The Custodian's credential is not platform-enforced read-only". The guarantee is enforced in `mnemos_custodian.allowlist` + `CustodianMcpClient.call_tool()`'s backstop instead, both tested against the real server |
 
 ## AWS
 
@@ -84,6 +84,7 @@ before any code was written against it (ADR-013).
       manual; see docs/limits.md
 - [ ] Dedicated Warden execution role — would narrow the KMS key policy's
       `ScheduleKeyDeletion` grant off the `mnemos` IAM user (Phase 04 deploy)
-- [ ] CockroachDB Cloud service account, read-only (Phase 07)
+- [x] CockroachDB Cloud service account (Phase 07) — provisioned 2026-08-09,
+      not read-only (see MCP access table above)
 - [ ] Cockroach Labs community Slack
 - [ ] Devpost registration

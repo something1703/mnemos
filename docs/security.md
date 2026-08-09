@@ -141,6 +141,16 @@ five that matter most for a security review:
   process itself, which would inherit both roles' credentials. A separate
   Warden Lambda with its own IAM role (PHASE_06 6.1's original design) closes
   that gap and has not been built. `docs/limits.md` §Deployment topology.
+- **The Custodian's read-only guarantee is application-layer, not
+  platform-layer.** Tested against the real cluster: no CockroachDB Cloud
+  IAM role short of Cluster Admin unlocks the MCP server's SQL tools for a
+  service account at all — Cluster Monitor and Cluster Developer both block
+  every SQL-shaped tool outright, not just writes. The Custodian's actual
+  credential is Admin, genuinely capable of `create_database` (verified
+  directly). What actually stops it from writing is
+  `mnemos_custodian.allowlist` plus `CustodianMcpClient.call_tool()`'s own
+  refusal to invoke a write-capable tool by name, both tested — not the
+  account's own privileges. `docs/limits.md` §The Custodian's credential.
 - **Dual control proves a second key, not a second human** (§2 above).
 - **What has not been executed yet, stated plainly:** adversarial
   red-teaming (Phase 10) and load/scale measurement (Phase 11) have not run

@@ -195,6 +195,48 @@ time is better spent on.
 
 ---
 
+## The Custodian's credential is not platform-enforced read-only
+
+PHASE_07_CUSTODIAN.md 7.2 calls for a service account that is "**read-only
+asserted at startup**" against the CockroachDB Cloud MCP server. Tested
+against the real `mnemos` cluster (2026-08-09), against every Cloud IAM role
+available to a service account:
+
+| Role tried | Cloud API calls (`get_cluster`, `list_clusters`) | SQL tools (`list_databases`, `show_running_queries`, `list_tables`, ...) |
+|---|---|---|
+| Cluster Monitor | work | **all `unauthorized`** |
+| Cluster Developer | work | **all `unauthorized`** |
+| Cluster Admin | work | **work — including `create_database`** |
+
+No role between Monitor/Developer and Admin exists to test against a service
+account for this integration. The two systems are genuinely separate —
+CockroachDB's own docs confirm "SQL users are granted a distinct set of
+roles and privileges... independent of the Cloud user roles" — and the
+cluster's real SQL Users (the ones with actual database grants:
+`mnemos_api_svc`, `mnemos_pipeline_svc`, `mnemos_warden_svc`) have no
+corresponding entry for the Custodian's service account at all; there is no
+console surface found that binds a Cloud API service account to a scoped SQL
+identity for this MCP integration.
+
+**What this means:** the Custodian's actual credential is Cluster Admin —
+capable of `create_database`/`create_table`/`insert_rows` if asked, verified
+directly (a real, harmless scratch database was created and had to be
+dropped by hand, since the client holds no DELETE/DROP capability by
+design). The read-only *guarantee* PHASE_07 asks for is therefore enforced
+entirely at the application layer, not the platform layer:
+`mnemos_custodian.allowlist` never maps any skill to a write-capable tool
+(checked statically, `tests/custodian/test_allowlist.py`), and
+`CustodianMcpClient.call_tool()` independently refuses to invoke any of
+`create_database`/`create_table`/`insert_rows` by name regardless of what
+any allowlist entry says (`ReadOnlyGuaranteeViolated`, tested against both a
+fake and the real live server). Two things would have to be wrong at once —
+a bad allowlist entry *and* that backstop removed — for the Custodian's own
+code to attempt a write. That is a real, tested guarantee; it is a weaker
+one than "the account itself cannot write even if asked," and this page
+says so rather than implying otherwise.
+
+---
+
 ## Tenant isolation
 
 **RLS defends against our bugs, not against a hostile SQL session.** Policies key

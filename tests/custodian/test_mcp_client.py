@@ -1,11 +1,12 @@
 """`CustodianMcpClient` against a real in-process `MCPServer`, not a
 hand-mocked stand-in — a fake server can advertise the exact tool names a
-real CockroachDB Cloud MCP session would, including a deliberately
-write-capable one, and `mcp.Client`/`mcp.server.mcpserver.MCPServer`'s real
-wire format runs underneath. `mnemos_custodian.mcp_client.CustodianMcpClient`
-accepts a `server=` override for exactly this — see its own docstring for
-why real credentials still need `tests/custodian/test_mcp_client_live.py`
-(not yet written; blocked on the Custodian's service account key)."""
+real CockroachDB Cloud MCP session would, and `mcp.Client`/
+`mcp.server.mcpserver.MCPServer`'s real wire format runs underneath.
+`mnemos_custodian.mcp_client.CustodianMcpClient` accepts a `server=`
+override for exactly this. `tests/custodian/test_mcp_client_live.py`
+(`@pytest.mark.cloud`) is the real-credentials counterpart — this file
+proves the logic in isolation; that one proves it against the actual
+CockroachDB Cloud MCP server."""
 
 from __future__ import annotations
 
@@ -35,21 +36,40 @@ def _read_only_server() -> MCPServer:
 
 
 def _server_exposing_a_write_tool() -> MCPServer:
+    """Reproduces the real, confirmed shape of the Custodian's actual
+    credential (see mcp_client.py's module docstring): create_database is
+    listed AND a real call against it succeeds. Connecting must still
+    succeed — the safety boundary is call_tool()'s refusal to invoke it,
+    not the connection itself."""
     server = _read_only_server()
 
-    @server.tool(name="create_table")
-    def create_table(database: str, ddl: str) -> str:
-        return "created"  # pragma: no cover — must never actually be reached
+    @server.tool(name="create_database")
+    def create_database(database: str) -> str:
+        return "created"  # pragma: no cover — call_tool() must never reach this
 
     return server
 
 
-async def test_hard_fails_when_a_write_capable_tool_is_reachable() -> None:
+async def test_connects_even_when_a_write_tool_is_reachable() -> None:
+    """No live write probe on connect (see module docstring for why: it
+    would create a real, uncleanable scratch database on every startup
+    against the Custodian's actual credential) — connecting only inventories
+    the catalog."""
     server = _server_exposing_a_write_tool()
-    client = CustodianMcpClient(server)
-    with pytest.raises(ReadOnlyGuaranteeViolated, match="create_table"):
-        async with client:
-            pass  # pragma: no cover — __aenter__ must raise before this runs
+    async with CustodianMcpClient(server) as client:
+        assert client._tool_names == {"show_running_queries", "list_tables", "create_database"}
+
+
+async def test_call_tool_refuses_a_write_capable_tool_even_if_somehow_requested() -> None:
+    """The backstop: call_tool() refuses create_database by name, before
+    even checking whether any skill's allowlist entry mentions it — the
+    ReadOnlyGuaranteeViolated backstop, independent of allowlist.py."""
+    server = _server_exposing_a_write_tool()
+    async with CustodianMcpClient(server) as client:
+        with pytest.raises(ReadOnlyGuaranteeViolated, match="write-capable"):
+            await client.call_tool(
+                "triaging-live-sql-activity", "create_database", {"database": "x"}
+            )
 
 
 async def test_connects_when_only_read_only_tools_are_reachable() -> None:
