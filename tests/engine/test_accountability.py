@@ -11,7 +11,8 @@ import uuid
 from datetime import UTC, datetime
 
 import pytest
-from mnemos_engine.accountability import explain, record_action
+from mnemos_engine.accountability import build_verifiable_export, explain, record_action
+from mnemos_engine.canonical import GENESIS_HASH, entry_hash, payload_hash
 from mnemos_engine.crypto import Envelope, LocalKeyWrapper, row_aad
 from mnemos_engine.db import Database
 from mnemos_engine.embeddings import FakeEmbedder, to_pgvector
@@ -456,3 +457,143 @@ async def test_manifest_is_serializable_for_the_revocation_row(
 
     assert json.loads(json.dumps(manifest))["counts"]["facts"] == 1
     assert datetime.now(UTC)  # sanity: the module imports cleanly
+
+
+# ------------------------------------------------- verifiable export (6.7)
+
+
+def _reverify_shard(entries: list[dict]) -> None:
+    """The same three-step recomputation docs/ledger.md §5.1 specifies —
+    using mnemos_engine.canonical directly, not mnemos_engine.ledger.verify_chain,
+    so this test does not just call the function it is supposed to be
+    checking the *inputs* to. This is also, not coincidentally, exactly the
+    algorithm the exported HTML's embedded JavaScript reimplements a third
+    time independently — see services/api/src/mnemos_api/deposition_html.py.
+    """
+    prev = GENESIS_HASH
+    for row in entries:
+        ph = payload_hash(row["payload"])
+        assert ph.hex() == row["payload_hash"], f"payload edited at seq {row['seq']}"
+        assert row["prev_hash"] == prev.hex(), f"chain spliced at seq {row['seq']}"
+        eh = entry_hash(ph, prev)
+        assert eh.hex() == row["entry_hash"], f"entry_hash wrong at seq {row['seq']}"
+        prev = eh
+
+
+async def test_verifiable_export_returns_none_for_an_unknown_action(
+    db: Database, tenant: uuid.UUID
+) -> None:
+    async def run(cur):
+        return await build_verifiable_export(cur, tenant, uuid.uuid4())
+
+    assert await db.transaction(tenant, run, label="export") is None
+
+
+async def test_verifiable_export_chain_entries_self_verify(
+    engine: MnemosEngine, db: Database, tenant: uuid.UUID
+) -> None:
+    """The data `build_verifiable_export` hands to the HTML exporter must be
+    a genuinely complete, genuinely valid hash chain from genesis — not a
+    display-filtered subset that merely looks plausible. This is the
+    property the whole "self-verifies offline" claim rests on."""
+    subject = "applicant:export"
+    text = "Subject reports a prior address in Lisbon."
+    episode = await engine.remember(
+        tenant,
+        subject_key=subject,
+        session_id=uuid.uuid4(),
+        event_type="record",
+        content=text,
+        source_trust=SourceTrust.OPERATOR,
+    )
+    await _fact_from(db, tenant, episode.event_id, subject, text)
+
+    session = uuid.uuid4()
+    recalled = await engine.recall(tenant, text, subject_key=subject, session_id=session)
+
+    async def declare_and_checkpoint(cur):
+        action_id = await record_action(
+            cur,
+            tenant,
+            action_type="verify",
+            description="Address verified.",
+            recall_ids=recalled.recall_ids,
+            actor="agent:reviewer",
+            session_id=session,
+            subject_key=subject,
+        )
+        await checkpoint(cur, tenant)
+        return action_id
+
+    action_id = await db.transaction(tenant, declare_and_checkpoint, label="declare")
+
+    async def run(cur):
+        return await build_verifiable_export(cur, tenant, action_id)
+
+    bundle = await db.transaction(tenant, run, label="export")
+    assert bundle is not None
+    assert bundle["chain_entries"], "the subject wrote audit entries; the export must include them"
+
+    for shard_id, entries in bundle["chain_entries"].items():
+        assert entries, f"shard {shard_id} listed with no entries"
+        _reverify_shard(entries)
+        seqs = [e["seq"] for e in entries]
+        assert seqs == list(range(1, len(entries) + 1)), "seq must be contiguous from 1"
+
+    checkpoint_bundle = bundle["checkpoint"]
+    assert checkpoint_bundle is not None
+    assert checkpoint_bundle["checkpoint_seq"] == bundle["deposition"].checkpoint_seq
+    assert checkpoint_bundle["merkle_root"] == bundle["deposition"].merkle_root
+    # Every shard this export embeds must be one of the checkpoint's own
+    # recorded shard heads — the HTML exporter's Merkle recomputation is only
+    # meaningful if these two agree on which shards exist.
+    for shard_id in bundle["chain_entries"]:
+        assert shard_id in checkpoint_bundle["shard_heads"]
+
+
+async def test_verifiable_export_tampered_payload_fails_reverification(
+    engine: MnemosEngine, db: Database, tenant: uuid.UUID
+) -> None:
+    """The negative control: `_reverify_shard` (and, by construction, the
+    exported HTML's JS) must actually notice a tampered entry, not just pass
+    unconditionally on well-formed input."""
+    subject = "applicant:export-tamper"
+    text = "Subject confirms date of birth."
+    episode = await engine.remember(
+        tenant,
+        subject_key=subject,
+        session_id=uuid.uuid4(),
+        event_type="record",
+        content=text,
+        source_trust=SourceTrust.OPERATOR,
+    )
+    await _fact_from(db, tenant, episode.event_id, subject, text)
+    session = uuid.uuid4()
+    recalled = await engine.recall(tenant, text, subject_key=subject, session_id=session)
+
+    async def declare_and_checkpoint(cur):
+        action_id = await record_action(
+            cur,
+            tenant,
+            action_type="verify",
+            description="DOB verified.",
+            recall_ids=recalled.recall_ids,
+            actor="agent:reviewer",
+            session_id=session,
+            subject_key=subject,
+        )
+        await checkpoint(cur, tenant)
+        return action_id
+
+    action_id = await db.transaction(tenant, declare_and_checkpoint, label="declare")
+
+    async def run(cur):
+        return await build_verifiable_export(cur, tenant, action_id)
+
+    bundle = await db.transaction(tenant, run, label="export")
+    assert bundle is not None
+    _shard_id, entries = next(iter(bundle["chain_entries"].items()))
+    entries[-1]["payload"] = {**entries[-1]["payload"], "actor": "someone else entirely"}
+
+    with pytest.raises(AssertionError, match="payload edited"):
+        _reverify_shard(entries)

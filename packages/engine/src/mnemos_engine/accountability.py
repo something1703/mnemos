@@ -413,3 +413,72 @@ async def _covering_checkpoint(
 
 def _maybe_float(value: Any) -> float | None:
     return float(value) if value is not None else None
+
+
+async def build_verifiable_export(
+    cur: psycopg.AsyncCursor, tenant_id: UUID, action_id: UUID
+) -> dict[str, Any] | None:
+    """Everything `explain()` returns, plus the raw chain data a caller needs
+    to recompute the hashes themselves — the payload behind the self-verifying
+    HTML deposition export (PHASE_06 6.7).
+
+    `Deposition.audit_trail` (from `explain()`) is filtered to this subject's
+    own entries — right for *display*, wrong for *verification*: proving
+    `prev_hash` linkage needs the shard's complete, unfiltered sequence,
+    because seq numbers interleave across every subject that happens to hash
+    to the same shard. So this fetches, for every shard `audit_trail`
+    touches, the full ordered chain from seq 1 — exactly what
+    `mnemos_engine.ledger.verify_chain` reads server-side — plus the covering
+    checkpoint's complete `shard_heads`, so a caller can redo both halves of
+    verification (`docs/ledger.md` §5.1 and §5.2) with zero trust in this
+    process's own arithmetic.
+
+    Returns `None` under the same condition `explain()` does: no such action.
+    """
+    deposition = await explain(cur, tenant_id, action_id)
+    if deposition is None:
+        return None
+
+    shard_ids = sorted({a.shard_id for a in deposition.audit_trail})
+    chain_entries: dict[str, list[dict[str, Any]]] = {}
+    for shard_id in shard_ids:
+        await cur.execute(
+            "SELECT seq, payload, payload_hash, prev_hash, entry_hash "
+            "FROM mnemos.audit_chain WHERE tenant_id = %s AND shard_id = %s ORDER BY seq",
+            (tenant_id, shard_id),
+        )
+        chain_entries[str(shard_id)] = [
+            {
+                "seq": int(seq),
+                "payload": payload,
+                "payload_hash": bytes(payload_hash).hex(),
+                "prev_hash": bytes(prev_hash).hex(),
+                "entry_hash": bytes(entry_hash).hex(),
+            }
+            for seq, payload, payload_hash, prev_hash, entry_hash in await cur.fetchall()
+        ]
+
+    checkpoint: dict[str, Any] | None = None
+    if deposition.checkpoint_seq is not None:
+        await cur.execute(
+            "SELECT merkle_root, shard_heads, entry_count, anchor_uri, anchored_at "
+            "FROM mnemos.chain_checkpoints WHERE tenant_id = %s AND checkpoint_seq = %s",
+            (tenant_id, deposition.checkpoint_seq),
+        )
+        row = await cur.fetchone()
+        if row is not None:
+            merkle_root_hex, shard_heads, entry_count, anchor_uri, anchored_at = row
+            checkpoint = {
+                "checkpoint_seq": deposition.checkpoint_seq,
+                "merkle_root": bytes(merkle_root_hex).hex(),
+                "shard_heads": dict(shard_heads),
+                "entry_count": int(entry_count),
+                "anchor_uri": anchor_uri,
+                "anchored_at": anchored_at.isoformat() if anchored_at else None,
+            }
+
+    return {
+        "deposition": deposition,
+        "chain_entries": chain_entries,
+        "checkpoint": checkpoint,
+    }

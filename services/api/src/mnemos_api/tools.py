@@ -310,7 +310,11 @@ def register_tools(server: Any, runtime: Runtime) -> None:
             "credentials needed) to fetch and independently verify that anchored root, "
             "not just trust the anchor_uri string.\n\n"
             "Source episode CONTENT is never included, only its hash: a deposition may "
-            "legitimately cross a jurisdiction the underlying record may not."
+            "legitimately cross a jurisdiction the underlying record may not.\n\n"
+            "For a self-contained artifact to hand an auditor — a single HTML file that "
+            "renders this deposition and reverifies its own hashes offline, in the "
+            "browser, with no Mnemos code trusted to check its own math — fetch "
+            "GET /v1/deposition/{action_id}/export.html from the REST API."
         ),
     )
     async def explain(action_id: str) -> dict[str, Any]:

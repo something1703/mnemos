@@ -27,9 +27,13 @@ from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse
+from mnemos_engine.accountability import build_verifiable_export
 from mnemos_engine.accountability import explain as engine_explain
 from mnemos_engine.ledger import verify_chain
+from mnemos_warden.attestation import presign_anchor_url
 
+from .deposition_html import render_deposition_html
 from .keys import AuthError, Principal, Scope, require, resolve_key
 from .runtime import Runtime
 
@@ -377,6 +381,48 @@ def build_rest_app(runtime: Runtime) -> FastAPI:
             ],
             "summary": result.summary(),
         }
+
+    @app.get("/v1/deposition/{action_id}/export.html", tags=["accountability"])
+    async def deposition_export(action_id: UUID, principal: CurrentPrincipal) -> HTMLResponse:
+        """The artifact PHASE_06 6.7 calls the clearest single expression of
+        what Mnemos is for: a self-contained HTML file that renders this
+        deposition and independently reverifies its own hashes offline, in
+        the browser — the thing you hand an auditor or attach to an incident
+        report. See `mnemos_api.deposition_html` for what it actually proves
+        and what it cannot (verifying against the outside S3 anchor needs a
+        network call, offered as an explicit, separate button)."""
+        require(principal, Scope.READ, "deposition_export")
+
+        async def run(cur: Any) -> Any:
+            return await build_verifiable_export(cur, principal.tenant_id, action_id)
+
+        bundle = await runtime.db.transaction(
+            principal.tenant_id, run, label="rest_deposition_export", read_only=True
+        )
+        if bundle is None:
+            raise HTTPException(404, f"no action {action_id} in this tenant")
+
+        bundle["deposition"] = bundle["deposition"].model_dump(mode="json")
+
+        anchor_url: str | None = None
+        checkpoint = bundle["checkpoint"]
+        if (
+            checkpoint
+            and checkpoint.get("anchor_uri")
+            and runtime.s3
+            and runtime.settings.anchor_bucket
+        ):
+            try:
+                anchor_url = presign_anchor_url(
+                    s3=runtime.s3,
+                    bucket=runtime.settings.anchor_bucket,
+                    tenant_id=principal.tenant_id,
+                    checkpoint_seq=checkpoint["checkpoint_seq"],
+                )
+            except Exception:
+                log.warning("failed to presign anchor URL for deposition export", exc_info=True)
+
+        return HTMLResponse(content=render_deposition_html(bundle, anchor_presigned_url=anchor_url))
 
     @app.get("/v1/residency/{subject_key:path}", tags=["governance"])
     async def residency(subject_key: str, principal: CurrentPrincipal) -> dict[str, Any]:

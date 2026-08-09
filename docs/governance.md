@@ -130,6 +130,21 @@ fetch and independently verify the anchor without ever holding an AWS
 credential (`mnemos-attest presign`, wired into `explain()` as of this
 hardening pass).
 
+`GET /v1/deposition/{action_id}/export.html` renders the same deposition as
+a single, self-contained HTML file that reverifies its own hashes **offline,
+in the browser** — no CDN, no build step, no Mnemos code trusted to check
+its own math. It embeds the complete audit-chain segment (genesis to head)
+for every shard the action's own audit trail touches, plus the covering
+checkpoint's full `shard_heads`, and reimplements `docs/ledger.md`'s hash
+construction a second, independent time in JavaScript
+(`services/api/src/mnemos_api/deposition_html.py`). The one step that needs
+network access — comparing against the S3-anchored root — is an explicit,
+separate button, not silently bundled into "offline verify": an exported
+file cannot re-read the live database, so what it proves is "this export's
+own chain segment and checkpoint are internally consistent, genesis to
+head," not "the database has not been touched since." `mnemos-attest
+verify` against a live connection is what proves the latter.
+
 ## 7. What is not yet built
 
 The Custodian (Phase 07) — an LLM agent that may *propose* governance actions
