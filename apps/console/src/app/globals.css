@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+/* brand/tokens.css is the source of truth (ADR-004). This file is generated
+ * from it by scripts/sync-brand.mjs on every predev/prebuild and is gitignored,
+ * so the palette has exactly one editable home and cannot drift. */
+@import "./brand.generated.css";
+
+/* Tailwind v4 is CSS-first: @theme is what turns a token into a utility, so
+ * `bg-veil` / `text-synapse` / `font-display` all trace back to tokens.css
+ * rather than to a hardcoded hex anywhere in this app. */
+@theme inline {
+  --color-abyss: var(--abyss);
+  --color-veil: var(--veil);
+  --color-veil-hi: var(--veil-hi);
+  --color-hairline: var(--hairline);
+
+  --color-parchment: var(--parchment);
+  --color-moonstone: var(--moonstone);
+  --color-dim: var(--dim);
+
+  --color-synapse: var(--synapse);
+  --color-synapse-fill: var(--synapse-fill);
+  --color-synapse-edge: var(--synapse-edge);
+
+  --color-ember: var(--ember);
+  --color-ember-fill: var(--ember-fill);
+  --color-ember-edge: var(--ember-edge);
+
+  --color-signal: var(--signal);
+  --color-signal-fill: var(--signal-fill);
+  --color-signal-edge: var(--signal-edge);
+
+  --color-umbra: var(--umbra);
+  --color-umbra-fill: var(--umbra-fill);
+  --color-umbra-edge: var(--umbra-edge);
+
+  --font-display: var(--font-bricolage), "Bricolage Grotesque", ui-sans-serif, system-ui,
+    sans-serif;
+  --font-body: var(--font-albert), "Albert Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-spline), "Spline Sans Mono", ui-monospace, "SF Mono", monospace;
+
+  --radius-sm: 4px;
+  --radius-DEFAULT: 8px;
+  --radius-lg: 14px;
+
+  --ease-brand: cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--abyss);
+    color: var(--parchment);
+    font-family: var(--font-albert), "Albert Sans", ui-sans-serif, system-ui, sans-serif;
+    line-height: var(--leading-body);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* 8.4 asks for visible keyboard focus. A global :focus-visible ring means it
+   * is the default state of every interactive element rather than something
+   * each component has to remember. */
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--ring);
+    border-radius: var(--radius-sm);
+  }
+
+  /* Forced-colors mode must keep the trust lattice legible — the shapes in
+   * TrustBadge carry the meaning there, but borders still need to survive. */
+  @media (forced-colors: active) {
+    * {
+      border-color: CanvasText;
+    }
+  }
+}
+
+@layer utilities {
+  /* Mono is semantic (BRAND.md): machine-authored, verifiable values only. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
