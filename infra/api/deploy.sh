@@ -65,6 +65,17 @@ for line in pathlib.Path(os.environ["ROOT"], ".env").read_text().splitlines():
         continue
     key, _, value = line.partition("=")
     if key in wanted and value:
+        # dotenv quotes these DSNs so that sourcing the file with
+        # "set -a" survives the literal ampersand in the query string -- a
+        # shell convenience this plain line parser does not know about on
+        # its own. Left unstripped, appending "&sslrootcert=system" below
+        # lands OUTSIDE the trailing quote, splitting the value into two
+        # connection strings glued together with an ampersand. Found via
+        # the sleep-cycle deploy script failing to connect: this deployed
+        # secret carried the same latent bug, just not yet triggered by a
+        # redeploy since the dotenv format changed.
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+            value = value[1:-1]
         raw[key] = value
 
 # MNEMOS_DB_URL in .env is the admin login: migrations and seeding need DDL, so

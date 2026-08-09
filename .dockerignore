@@ -22,3 +22,9 @@ infra/
 # Excluding it makes the build fail at metadata parse time, some distance from
 # the line that actually caused it.
 !README.md
+# ...and the sleep cycle's prompts, which are runtime data the image reads via
+# importlib.resources, not documentation. A blanket *.md rule silently
+# dropping these would build successfully and fail only once deployed, when
+# resources.files(...).read_text() raises inside a cold-starting Lambda — see
+# services/sleep-cycle/src/mnemos_sleep_cycle/distill.py.
+!services/sleep-cycle/src/mnemos_sleep_cycle/prompts/*.md

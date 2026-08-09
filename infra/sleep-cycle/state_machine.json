@@ -1,0 +1,69 @@
+{
+  "Comment": "Mnemos sleep cycle — nightly full run. Two stages of the same Lambda: exhaustive consolidation, then a Merkle checkpoint of whatever it produced. Each stage gets its own retry policy and its own row in Step Functions' execution history, which is the whole reason this exists instead of one Lambda invocation doing both silently — a judge (or an operator at 3am) can see exactly which stage failed and why, and consolidation succeeding is what should gate the checkpoint running, not the other way around.",
+  "StartAt": "Consolidate",
+  "States": {
+    "Consolidate": {
+      "Type": "Task",
+      "Resource": "${LambdaArn}",
+      "Parameters": {
+        "stage": "consolidate",
+        "limit": 200
+      },
+      "Retry": [
+        {
+          "ErrorEquals": ["LLMError"],
+          "IntervalSeconds": 30,
+          "MaxAttempts": 2,
+          "BackoffRate": 2.0
+        },
+        {
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 15,
+          "MaxAttempts": 2,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "ConsolidationFailed"
+        }
+      ],
+      "Next": "Checkpoint"
+    },
+    "Checkpoint": {
+      "Type": "Task",
+      "Resource": "${LambdaArn}",
+      "Parameters": {
+        "stage": "checkpoint"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 15,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "CheckpointFailed"
+        }
+      ],
+      "End": true
+    },
+    "ConsolidationFailed": {
+      "Type": "Fail",
+      "Error": "ConsolidationFailed",
+      "Cause": "Consolidation did not complete after retries; checkpoint was not attempted so it never commits a root over a run that did not finish."
+    },
+    "CheckpointFailed": {
+      "Type": "Fail",
+      "Error": "CheckpointFailed",
+      "Cause": "Consolidation completed but the Merkle checkpoint did not — facts were written, but this cycle produced no anchor-able root."
+    }
+  }
+}

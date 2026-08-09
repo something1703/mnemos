@@ -184,6 +184,18 @@ deploy-api-fast: ## Redeploy config + smoke test without rebuilding the image
 logs-api: ## Tail the deployed API's CloudWatch logs
 	aws logs tail /aws/lambda/mnemos-api --follow --format short
 
+.PHONY: deploy-sleep-cycle
+deploy-sleep-cycle: ## Build image, push, deploy Lambda + Step Functions + EventBridge + alarm
+	bash infra/sleep-cycle/deploy.sh
+
+.PHONY: deploy-sleep-cycle-fast
+deploy-sleep-cycle-fast: ## Redeploy config + smoke test without rebuilding the image
+	SKIP_BUILD=1 bash infra/sleep-cycle/deploy.sh
+
+.PHONY: logs-sleep-cycle
+logs-sleep-cycle: ## Tail the deployed sleep cycle's CloudWatch logs
+	aws logs tail /aws/lambda/mnemos-sleep-cycle --follow --format short
+
 .PHONY: smoke
 smoke: ## Prove a deployment works AND that its guarantees hold (exit != 0 on failure)
 	uv run python examples/clients/smoke.py
