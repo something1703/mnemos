@@ -10,11 +10,14 @@ a formality:
     unauditable even if it is otherwise perfectly logged.
 
 Dual control — a tenant-configurable requirement for two distinct admin keys
-on destructive operations — is enforced at the API layer (Phase 04.2), not
-here. The Warden's contract is per-call: given a caller who is already
-authorized, do exactly what was asked, loudly, or refuse loudly. Whether that
-caller needed a second approval to get here is a question the API answered
-before this class was ever invoked.
+on destructive operations — is checked here too, when a caller passes
+`admin_key_id`/`admin_label` (the API layer's job is resolving those from a
+presented key and deciding whether to pass them at all; this class does not
+authenticate anything). `admin_key_id=None` (the default) skips the check
+entirely, which is what every non-API caller — tests, demos, the CLI — wants:
+dual control is a property of agent-facing admin traffic, not of this class's
+own contract. See `approvals.py` for why the DELETE this needs lives here
+rather than in `services/api`.
 
 This class deliberately has ZERO dependency on any LLM SDK — see
 `guarantees.py` and `make no-model-in-warden`. It is the only thing in Mnemos
@@ -32,6 +35,7 @@ from mnemos_engine.db import Database
 from mnemos_engine.integrity import BlastRadius
 
 from . import erasure
+from .approvals import enforce as _enforce_dual_control
 from .errors import ConfirmationRequired
 from .holds import active_hold, list_holds, release_legal_hold, set_legal_hold
 from .keys import KeyProvider
@@ -54,6 +58,33 @@ def _require(confirm: bool, reason: str, operation: str) -> None:
         raise ConfirmationRequired(f"{operation} requires a non-empty reason")
 
 
+async def _maybe_dual_control(
+    db: Database,
+    tenant_id: UUID,
+    *,
+    operation: str,
+    target_key: str,
+    reason: str,
+    admin_key_id: UUID | None,
+    admin_label: str | None,
+) -> None:
+    """No-op when `admin_key_id` is absent — every non-API caller (tests,
+    demos, the CLI) gets exactly the old, ungated behaviour. See
+    `approvals.py` for what happens when it is present."""
+    if admin_key_id is None:
+        return
+    assert admin_label is not None, "admin_label is required whenever admin_key_id is given"
+    await _enforce_dual_control(
+        db,
+        tenant_id,
+        operation=operation,
+        target_key=target_key,
+        reason=reason,
+        admin_key_id=admin_key_id,
+        admin_label=admin_label,
+    )
+
+
 class Warden:
     def __init__(self, db: Database, *, key_provider: KeyProvider) -> None:
         self._db = db
@@ -73,9 +104,26 @@ class Warden:
         return await self._db.transaction(tenant_id, run, label="preview_erasure")
 
     async def redact(
-        self, tenant_id: UUID, subject_key: str, *, actor: str, reason: str, confirm: bool = False
+        self,
+        tenant_id: UUID,
+        subject_key: str,
+        *,
+        actor: str,
+        reason: str,
+        confirm: bool = False,
+        admin_key_id: UUID | None = None,
+        admin_label: str | None = None,
     ) -> ErasureResult:
         _require(confirm, reason, "redact")
+        await _maybe_dual_control(
+            self._db,
+            tenant_id,
+            operation="redact",
+            target_key=subject_key,
+            reason=reason,
+            admin_key_id=admin_key_id,
+            admin_label=admin_label,
+        )
 
         async def run(cur: psycopg.AsyncCursor) -> ErasureResult:
             return await erasure.execute_redact(
@@ -87,9 +135,26 @@ class Warden:
         return result
 
     async def forget(
-        self, tenant_id: UUID, subject_key: str, *, actor: str, reason: str, confirm: bool = False
+        self,
+        tenant_id: UUID,
+        subject_key: str,
+        *,
+        actor: str,
+        reason: str,
+        confirm: bool = False,
+        admin_key_id: UUID | None = None,
+        admin_label: str | None = None,
     ) -> ErasureResult:
         _require(confirm, reason, "forget")
+        await _maybe_dual_control(
+            self._db,
+            tenant_id,
+            operation="forget",
+            target_key=subject_key,
+            reason=reason,
+            admin_key_id=admin_key_id,
+            admin_label=admin_label,
+        )
 
         async def run(cur: psycopg.AsyncCursor) -> ErasureResult:
             return await erasure.execute_forget(
@@ -109,9 +174,26 @@ class Warden:
         return result
 
     async def quarantine(
-        self, tenant_id: UUID, subject_key: str, *, actor: str, reason: str, confirm: bool = False
+        self,
+        tenant_id: UUID,
+        subject_key: str,
+        *,
+        actor: str,
+        reason: str,
+        confirm: bool = False,
+        admin_key_id: UUID | None = None,
+        admin_label: str | None = None,
     ) -> ErasureResult:
         _require(confirm, reason, "quarantine")
+        await _maybe_dual_control(
+            self._db,
+            tenant_id,
+            operation="quarantine",
+            target_key=subject_key,
+            reason=reason,
+            admin_key_id=admin_key_id,
+            admin_label=admin_label,
+        )
 
         async def run(cur: psycopg.AsyncCursor) -> ErasureResult:
             return await erasure.execute_quarantine(
@@ -121,13 +203,30 @@ class Warden:
         return await self._db.transaction(tenant_id, run, label="quarantine")
 
     async def shred(
-        self, tenant_id: UUID, subject_key: str, *, actor: str, reason: str, confirm: bool = False
+        self,
+        tenant_id: UUID,
+        subject_key: str,
+        *,
+        actor: str,
+        reason: str,
+        confirm: bool = False,
+        admin_key_id: UUID | None = None,
+        admin_label: str | None = None,
     ) -> ErasureResult:
         """FORGET plus destruction of the tenant's data key. Irreversible and
         TENANT-WIDE: every row this tenant has ever written becomes
         unrecoverable, not just this subject's. Confirm here is confirming
         that scope, not just this one subject's erasure."""
         _require(confirm, reason, "shred")
+        await _maybe_dual_control(
+            self._db,
+            tenant_id,
+            operation="shred",
+            target_key=subject_key,
+            reason=reason,
+            admin_key_id=admin_key_id,
+            admin_label=admin_label,
+        )
 
         async def run(cur: psycopg.AsyncCursor) -> ErasureResult:
             return await erasure.execute_shred(
@@ -159,8 +258,19 @@ class Warden:
         actor: str,
         reason: str,
         confirm: bool = False,
+        admin_key_id: UUID | None = None,
+        admin_label: str | None = None,
     ) -> RevocationRecord:
         _require(confirm, reason, "revoke_source")
+        await _maybe_dual_control(
+            self._db,
+            tenant_id,
+            operation="revoke_source",
+            target_key=",".join(sorted(str(e) for e in source_event_ids)),
+            reason=reason,
+            admin_key_id=admin_key_id,
+            admin_label=admin_label,
+        )
 
         async def run(cur: psycopg.AsyncCursor) -> RevocationRecord:
             return await _revoke_source(
@@ -191,8 +301,19 @@ class Warden:
         placed_by: str,
         expires_at: datetime | None = None,
         confirm: bool = False,
+        admin_key_id: UUID | None = None,
+        admin_label: str | None = None,
     ) -> LegalHold:
         _require(confirm, matter_reference, "set_legal_hold")
+        await _maybe_dual_control(
+            self._db,
+            tenant_id,
+            operation="set_legal_hold",
+            target_key=subject_key,
+            reason=matter_reference,
+            admin_key_id=admin_key_id,
+            admin_label=admin_label,
+        )
 
         async def run(cur: psycopg.AsyncCursor) -> LegalHold:
             return await set_legal_hold(

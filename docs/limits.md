@@ -181,6 +181,30 @@ containment, not prevention, is the claim we make loudly.
 
 ---
 
+## Dual control
+
+**A second distinct API key, not a second distinct human.** Enabling
+`mnemos.tenants.dual_control` requires two different admin key IDs to approve
+a `forget`/`shred`/`redact`/`quarantine`/`revoke_source`/`set_legal_hold`
+call against the same target before it executes — but nothing in this system
+binds a key to the person holding it. Two admin keys issued to, and used by,
+the same person satisfy the check as completely as two keys held by two
+different people. The control it verifies is "a second credential approved
+this," not "a second person reviewed this" — the latter is an organizational
+practice a key-issuance policy has to supply, not something the software can
+enforce on its own.
+
+**The approval window is 15 minutes, and expiry is silent to the second
+caller.** A first approval that nobody acts on within that window is simply
+gone; the next call against the same target is treated as a fresh first
+approval, not told that an earlier one existed and lapsed. This is
+deliberate — a stale approval should not become a standing authorization
+just because someone eventually got around to it — but it means a legitimate
+two-person workflow that takes longer than 15 minutes between approvals will
+need to start over.
+
+---
+
 ## Scale
 
 Numbers land in `docs/scale.md` as Phase 11.3 measures them. Until then this

@@ -39,7 +39,7 @@ from mnemos_engine.models import SourceTrust
 from mnemos_engine.procedural import find_skill as engine_find_skill
 from mnemos_engine.procedural import learn_skill as engine_learn_skill
 from mnemos_warden.attestation import presign_anchor_url
-from mnemos_warden.errors import UnknownSubject
+from mnemos_warden.errors import DualControlRequired, UnknownSubject
 from mnemos_warden.models import EraseMode
 from mnemos_warden.residency import enforce_recall_projection
 
@@ -570,7 +570,11 @@ def register_tools(server: Any, runtime: Runtime) -> None:
             "subject.\n\n"
             "Refused outright if the subject is under legal hold — the refusal cites "
             "the matter reference. Call with confirm=false first to preview exactly "
-            "what would be destroyed."
+            "what would be destroyed.\n\n"
+            "If this tenant has dual control enabled, a confirm=true call from one "
+            "admin key records an approval and is refused (DUAL CONTROL); a SECOND, "
+            "DISTINCT admin key calling this again for the same subject_key and mode "
+            "is what actually executes it. The approval expires after 15 minutes."
         ),
     )
     async def forget(
@@ -627,7 +631,15 @@ def register_tools(server: Any, runtime: Runtime) -> None:
                 actor=f"agent:{principal.label}",
                 reason=reason,
                 confirm=True,
+                admin_key_id=principal.key_id,
+                admin_label=principal.label,
             )
+        except DualControlRequired as exc:
+            raise ToolError(
+                f"DUAL CONTROL: {exc.first_approver} has approved this {mode} of "
+                f"{subject_key!r}; a second, distinct admin key must call this again "
+                "with confirm=true to execute it. Nothing was modified."
+            ) from exc
         except LegalHoldActive as exc:
             raise ToolError(
                 f"REFUSED: legal hold {exc.matter_reference} placed by {exc.placed_by}"
@@ -657,7 +669,8 @@ def register_tools(server: Any, runtime: Runtime) -> None:
             "revocation says the evidence should not be trusted, not that the record "
             "of what happened should vanish. Affected actions are marked "
             "contaminated, so explain() on them reports it afterwards.\n\n"
-            "Call with confirm=false to see the blast radius first."
+            "Call with confirm=false to see the blast radius first. Subject to dual "
+            "control the same way forget is, if this tenant has it enabled."
         ),
     )
     async def revoke_source(
@@ -677,13 +690,22 @@ def register_tools(server: Any, runtime: Runtime) -> None:
                 "next": "call again with confirm=true to revoke",
             }
 
-        record = await runtime.warden.revoke_source(
-            principal.tenant_id,
-            ids,
-            actor=f"agent:{principal.label}",
-            reason=reason,
-            confirm=True,
-        )
+        try:
+            record = await runtime.warden.revoke_source(
+                principal.tenant_id,
+                ids,
+                actor=f"agent:{principal.label}",
+                reason=reason,
+                confirm=True,
+                admin_key_id=principal.key_id,
+                admin_label=principal.label,
+            )
+        except DualControlRequired as exc:
+            raise ToolError(
+                f"DUAL CONTROL: {exc.first_approver} has approved revoking these "
+                "sources; a second, distinct admin key must call this again with "
+                "confirm=true to execute it. Nothing was modified."
+            ) from exc
         return {
             "executed": True,
             "revocation_id": str(record.revocation_id),
@@ -701,7 +723,8 @@ def register_tools(server: Any, runtime: Runtime) -> None:
             "A held subject cannot be forgotten or TTL-expired. Any erasure attempt "
             "fails loudly with this matter reference. Use when data must be preserved "
             "regardless of a deletion request — a system that always deletes on "
-            "request is not compliant, only obedient."
+            "request is not compliant, only obedient. Subject to dual control the "
+            "same way forget is, if this tenant has it enabled."
         ),
     )
     async def set_legal_hold(
@@ -710,13 +733,23 @@ def register_tools(server: Any, runtime: Runtime) -> None:
         confirm: bool = False,
     ) -> dict[str, Any]:
         principal = await _guard(Scope.ADMIN, "set_legal_hold")
-        hold = await runtime.warden.set_legal_hold(
-            principal.tenant_id,
-            subject_key,
-            matter_reference=matter_reference,
-            placed_by=f"agent:{principal.label}",
-            confirm=confirm,
-        )
+
+        try:
+            hold = await runtime.warden.set_legal_hold(
+                principal.tenant_id,
+                subject_key,
+                matter_reference=matter_reference,
+                placed_by=f"agent:{principal.label}",
+                confirm=confirm,
+                admin_key_id=principal.key_id if confirm else None,
+                admin_label=principal.label if confirm else None,
+            )
+        except DualControlRequired as exc:
+            raise ToolError(
+                f"DUAL CONTROL: {exc.first_approver} has approved this hold on "
+                f"{subject_key!r}; a second, distinct admin key must call this "
+                "again with confirm=true to execute it. Nothing was modified."
+            ) from exc
         return {
             "hold_id": str(hold.hold_id),
             "subject_key": hold.subject_key,
