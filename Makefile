@@ -51,7 +51,7 @@ golden-eval: ## Phase 05.1 distillation quality eval — spends real OpenAI cred
 
 .PHONY: cov
 cov: ## Coverage gate: packages/ must hold 90%
-	uv run pytest -m "not cloud and not rig and not aws and not slow" \
+	uv run pytest -m "not cloud and not rig and not aws and not slow and not llm" \
 		--cov=packages --cov-report=term-missing --cov-fail-under=90
 
 .PHONY: invariants
