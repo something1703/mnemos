@@ -237,6 +237,56 @@ says so rather than implying otherwise.
 
 ---
 
+## An agent cannot corroborate itself, so "two sweeps that agree" was never enough
+
+PHASE_07 7.3 promised that a Custodian finding is promoted "once two
+independent sweeps ... or a metric" agree. Running the real sweep four times
+against the live cluster showed the first half of that cannot work — and
+should not.
+
+`max_independent_corroborations` is a maximum bipartite matching of sessions
+against the four `source_trust` categories. Every sweep wrote `agent`, so N
+sweeps compete for one slot: `corroboration_count` is pinned at 1 forever and
+the fact stays `unverified` however many times the Custodian agrees with
+itself. That is the anti-poisoning primitive working exactly as `docs/
+trust.md` specifies, and loosening it so our own agent could self-promote
+would be the "too loose" failure `corroboration.py`'s docstring warns about.
+
+A second, independent defect hid behind it. Distillation re-paraphrased every
+finding, so four agreeing observations landed at **0.67–0.84** pairwise cosine
+similarity — under `revise.REINFORCE_THRESHOLD` (0.92), some under
+`COMPARE_FLOOR` (0.75) — and became four separate facts that could never
+corroborate each other even in principle. Even the *short* finding summaries
+were only 0.88–0.90 similar to each other. Free-text model phrasing does not
+reliably reinforce, so a gate keyed on text similarity fires on word choice
+rather than on evidence.
+
+Both are fixed, and neither fix loosened the gate:
+
+- `ops_finding` episodes bypass the distiller entirely
+  (`distill.PASSTHROUGH_EVENT_TYPE`) — a finding already *is* a crisp claim,
+  and re-describing it destroyed the only property corroboration needs.
+- Recurring conditions carry a `FindingCode` whose canonical sentence is
+  owned by code, not by the model, so the same condition observed twice
+  produces byte-identical text. Findings that match no known code keep their
+  free-text summary and therefore keep the old unreliable behaviour — an
+  honest limit of open-vocabulary findings.
+- The Custodian's *measured* readings (`cluster_state_finding`,
+  `check_backup_recency` — pure functions over control-plane data, no model)
+  enter as `external`; its interpretations stay `agent`. A measurement in one
+  sweep and an interpretation in another are then genuinely independent.
+
+Verified live, not just in tests: two Fargate sweeps produced one
+`ops_finding` fact at `trust='corroborated'`, `corroboration_count=2`, with
+provenance spanning two sessions × two trust categories, and
+`recall("is the database cluster healthy?")` returns it. Deliberately
+`corroborated` and not `trusted` — neither origin is system/operator.
+`tests/sleep_cycle/test_consolidate.py` pins both halves, including the one
+that matters most: three `agent`-only sweeps of the same finding still land
+on one fact and still stay `unverified`.
+
+---
+
 ## `ccloud` CLI cannot run non-interactively
 
 PHASE_07_CUSTODIAN.md 7.5 calls for the Custodian to "shell out to `ccloud`
@@ -317,6 +367,21 @@ Everything an LLM writes enters at `trust='unverified'` and is excluded from
 recall. Promotion requires independent corroboration — different session *and*
 different `source_trust`. So the **collusion threshold is 2**: an attacker who
 controls two sources that look independent can promote a fact.
+
+**That number was wrong until 2026-08-10, and the correction is worth stating
+plainly.** `source_trust` was an ordinary tool argument, and the caller
+choosing it is an LLM — so a prompt injection could instruct an agent to
+record its claim as `operator`, which is *trusted on arrival* and skips the
+gate entirely. The real threshold was 1, in a single call, with no collusion,
+against the exact control this page named. The only thing defending it was the
+tool description asking the model not to, and this document says two
+paragraphs down that prompt-level defenses fail. Now `system` and `operator`
+require an ADMIN key (`keys.py`'s `Principal.may_declare`, enforced on both
+`remember` and `learn_skill`; `learn_skill` mattered just as much, since a
+skill claiming operator provenance skips the quarantine that tool's own
+description promises). A write key may still declare `agent` or `external`,
+because neither is trusted on arrival and honest labelling is what makes
+`revoke_source` able to find the contamination later.
 
 That number is a tenant-configurable policy (`promotion_policy`), not a law of
 nature. Raising it trades poisoning resistance against how long legitimate

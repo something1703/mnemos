@@ -89,6 +89,12 @@ independent can promote a fact. That number is a tenant-configurable policy,
 not a law of nature — raising it trades poisoning resistance against how long
 legitimate knowledge takes to become usable.
 
+It was also, until 2026-08-10, not the real number. `source_trust` was a
+caller-supplied argument, so an injected agent could declare its own claim
+`operator` — trusted on arrival — and promote it in one call. The two
+trusted-on-arrival origins now require an admin key; see §6 and
+`docs/limits.md` §Memory poisoning for the full account.
+
 When prevention fails anyway, `revoke_source()` computes the transitive
 blast radius (episode → fact → skill → recall → action → laundered
 descendant episode) and, as of this hardening pass, no longer destroys
@@ -173,6 +179,18 @@ five that matter most for a security review:
   `aws cloudwatch set-alarm-state` against `mnemos-sleep-cycle-errors`) both
   ran end-to-end and exited 0, observed in `/ecs/mnemos-custodian`.
   `infra/custodian/README.md`.
+- **The corroboration gate was bypassable until 2026-08-10, by one argument.**
+  `source_trust` is what the whole poisoning defence rests on, and it was a
+  plain tool parameter — so a prompt injection could tell an agent to record
+  its claim as `operator`, which is trusted on arrival, and skip the gate in a
+  single call. `system`/`operator` now require an admin key on both `remember`
+  and `learn_skill`. Found while wiring Phase 07's Custodian, not by a
+  red-team pass; Phase 10 has not run yet. `docs/limits.md` §Memory poisoning.
+- **An agent cannot corroborate itself, so PHASE_07's "two sweeps that agree"
+  needed a real second source.** Measured readings from the control plane
+  enter as `external`, model interpretations as `agent`; repeated `agent`-only
+  sweeps stay `unverified` no matter how often they agree, by design.
+  Verified live. `docs/limits.md` §An agent cannot corroborate itself.
 - **Dual control proves a second key, not a second human** (§2 above).
 - **What has not been executed yet, stated plainly:** adversarial
   red-teaming (Phase 10) and load/scale measurement (Phase 11) have not run

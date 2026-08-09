@@ -50,13 +50,13 @@ async def test_remember_then_recall_through_dispatch(server, tenant, as_principa
                 "subject_key": "patient:rt",
                 "content": "Severe anaphylactic allergy to penicillin.",
                 "event_type": "intake",
-                "source_trust": "operator",
+                "source_trust": "external",
                 "session_id": session,
             },
         )
     )
     assert written["subject_key"] == "patient:rt"
-    assert written["source_trust"] == "operator"
+    assert written["source_trust"] == "external"
     uuid.UUID(written["event_id"])  # parses => a real id came back
 
 

@@ -59,6 +59,55 @@ class ToolSource(StrEnum):
     CCLOUD = "ccloud"
 
 
+class FindingCode(StrEnum):
+    """A stable identity for a recurring condition, and the reason
+    corroboration works at all.
+
+    Measured against the live cluster: two sweeps observing the *same* cluster
+    state produced "Cluster is not in the RUNNING state" and "Basic cluster is
+    not in the RUNNING state" — 0.9029 cosine similarity, under
+    `revise.REINFORCE_THRESHOLD` (0.92). Longer paraphrases scored 0.66-0.88.
+    So free-text model phrasing does not reliably reinforce even when it is
+    nearly identical, and a corroboration gate keyed on text similarity would
+    fire or not fire on the model's word choice — which is luck, not evidence.
+
+    A code fixes that at the source. Semantically identical observations
+    produce byte-identical claim text (`claim` below), so the same condition
+    seen twice lands on one fact every time. The model's own free-text summary
+    is kept as detail on the finding row; it just is not what the *claim*
+    is built from.
+
+    OTHER is the honest escape hatch: a finding the interpreter could not map
+    onto a known condition keeps its free-text summary as the claim, and
+    therefore keeps the old unreliable-reinforcement behaviour. That is a
+    limitation of open-vocabulary findings, not something a template can
+    paper over.
+    """
+
+    CLUSTER_NOT_RUNNING = "cluster_not_running"
+    BACKUPS_DISABLED = "backups_disabled"
+    NO_BACKUPS_FOUND = "no_backups_found"
+    BACKUP_STALE = "backup_stale"
+    OTHER = "other"
+
+    @property
+    def claim(self) -> str | None:
+        """The canonical sentence for this condition, or None for OTHER."""
+        return _CANONICAL_CLAIMS.get(self)
+
+
+_CANONICAL_CLAIMS: dict[FindingCode, str] = {
+    FindingCode.CLUSTER_NOT_RUNNING: "The CockroachDB cluster is not in the RUNNING state.",
+    FindingCode.BACKUPS_DISABLED: "Scheduled backups are disabled for the CockroachDB cluster.",
+    FindingCode.NO_BACKUPS_FOUND: (
+        "No completed backup exists for the CockroachDB cluster, despite backups being enabled."
+    ),
+    FindingCode.BACKUP_STALE: (
+        "The most recent CockroachDB backup is older than the configured backup frequency allows."
+    ),
+}
+
+
 @dataclass(frozen=True)
 class FindingDraft:
     """What the interpretation step produces, before it has a run_id or a
@@ -70,6 +119,15 @@ class FindingDraft:
     skill_id: str
     tool_source: ToolSource
     recommendation: str | None = None
+    code: FindingCode = FindingCode.OTHER
+    measured: bool = False
+    """True when this finding is a deterministic reading rather than a model's
+    interpretation — `check_backup_recency` computing staleness from the Cloud
+    API's own timestamps, not the interpreter deciding what a query result
+    means. It decides the `source_trust` the finding enters memory under
+    (`external` vs `agent`, see sweep.py), which is what lets a measurement
+    and an interpretation corroborate each other. Defaults False: anything the
+    model produced must say so."""
 
 
 @dataclass(frozen=True)
@@ -89,6 +147,8 @@ class Finding:
     recommendation: str | None
     fact_id: UUID | None
     created_at: datetime
+    code: FindingCode = FindingCode.OTHER
+    measured: bool = False
 
 
 async def start_run(
@@ -145,8 +205,8 @@ async def record_finding(
     await cur.execute(
         "INSERT INTO mnemos.custodian_findings "
         "(tenant_id, run_id, finding_id, severity, summary, evidence, "
-        " recommendation, skill_id, tool_source) "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) "
+        " recommendation, skill_id, tool_source, measured, code) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
         "RETURNING created_at",
         (
             tenant_id,
@@ -158,6 +218,8 @@ async def record_finding(
             draft.recommendation,
             draft.skill_id,
             str(draft.tool_source),
+            draft.measured,
+            str(draft.code),
         ),
     )
     row = await cur.fetchone()
@@ -174,6 +236,8 @@ async def record_finding(
         recommendation=draft.recommendation,
         fact_id=None,
         created_at=row[0],
+        code=draft.code,
+        measured=draft.measured,
     )
 
 

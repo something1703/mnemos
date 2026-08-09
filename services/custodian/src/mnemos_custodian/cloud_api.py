@@ -44,7 +44,7 @@ from typing import Any
 
 import httpx2
 
-from .findings import FindingDraft, Severity, ToolSource
+from .findings import FindingCode, FindingDraft, Severity, ToolSource
 
 DEFAULT_BASE_URL = "https://cockroachlabs.cloud"
 DEFAULT_TIMEOUT_SECONDS = 20.0
@@ -119,7 +119,9 @@ def check_backup_recency(
             evidence={"backup_config": config},
             skill_id="reviewing-cluster-health",
             tool_source=ToolSource.CCLOUD,
+            measured=True,
             recommendation="Enable scheduled backups immediately.",
+            code=FindingCode.BACKUPS_DISABLED,
         )
 
     frequency_minutes = config["frequency_minutes"]
@@ -132,7 +134,9 @@ def check_backup_recency(
             evidence={"backup_config": config},
             skill_id="reviewing-cluster-health",
             tool_source=ToolSource.CCLOUD,
+            measured=True,
             recommendation="Investigate why no backup has ever completed.",
+            code=FindingCode.NO_BACKUPS_FOUND,
         )
 
     as_of = datetime.fromisoformat(str(latest["as_of_time"]).replace("Z", "+00:00"))
@@ -148,7 +152,9 @@ def check_backup_recency(
             evidence={"latest_backup": latest, "backup_config": config},
             skill_id="reviewing-cluster-health",
             tool_source=ToolSource.CCLOUD,
+            measured=True,
             recommendation="Investigate why scheduled backups have stopped running.",
+            code=FindingCode.BACKUP_STALE,
         )
     return None
 

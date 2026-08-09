@@ -67,6 +67,11 @@ class EpisodeInput:
     provenance trust (system/operator origin promotes directly; see
     `corroboration.py`) without a second query back to episodic_events."""
 
+    event_type: str = "note"
+    """Also never shown to the model, and used for exactly one decision:
+    `ops_finding` episodes bypass distillation entirely (see
+    `_passthrough_fact`)."""
+
 
 class DistilledFact(Base):
     fact_text: str
@@ -110,6 +115,45 @@ def _render_user_prompt(episodes: list[EpisodeInput]) -> str:
     return "\n\n".join(blocks)
 
 
+PASSTHROUGH_EVENT_TYPE = "ops_finding"
+"""Episodes of this type skip the model and become facts verbatim.
+
+Measured against the live cluster before being written: four Custodian sweeps
+produced near-identical findings ("Cluster is not in the RUNNING state", three
+times word for word), and distillation rewrote each into a different long
+sentence. The resulting facts sat at 0.67-0.84 pairwise cosine similarity —
+under `revise.REINFORCE_THRESHOLD` (0.92), and some under `COMPARE_FLOOR`
+(0.75), so four agreeing observations became four separate `unverified` facts
+that could never corroborate each other.
+
+Distillation exists to turn a messy conversation into a crisp claim. An
+`ops_finding` arrives *as* a crisp claim — one structured-output `summary`
+field with its own severity and evidence — so re-describing it adds nothing
+and destroys the only property corroboration depends on: that the same
+observation, observed twice, produces the same sentence twice.
+
+Deliberately a passthrough and not a lower similarity threshold. Loosening
+`REINFORCE_THRESHOLD` to 0.67 would let genuinely distinct claims merge across
+every tenant and vertical; fixing the drift at its source costs nothing
+elsewhere."""
+
+_PASSTHROUGH_CONFIDENCE = 0.6
+"""Enough to be a real claim, deliberately short of the model-authored range.
+The finding is a faithful restatement of what a tool returned, so it does not
+get to arrive pre-confident — it still has to earn promotion through the
+corroboration gate like anything else."""
+
+
+def _passthrough_fact(episode: EpisodeInput) -> DistilledFact:
+    """One `ops_finding` episode, restated as itself."""
+    return DistilledFact(
+        fact_text=episode.content,
+        fact_kind=PASSTHROUGH_EVENT_TYPE,
+        confidence=_PASSTHROUGH_CONFIDENCE,
+        source_indices=[episode.index],
+    )
+
+
 async def distill_session(
     chat: ChatClient,
     episodes: list[EpisodeInput],
@@ -125,6 +169,17 @@ async def distill_session(
     """
     if not episodes:
         return DistillationResult(facts=[], episodes_considered=0)
+
+    passthrough = [ep for ep in episodes if ep.event_type == PASSTHROUGH_EVENT_TYPE]
+    episodes = [ep for ep in episodes if ep.event_type != PASSTHROUGH_EVENT_TYPE]
+    passthrough_facts = [_passthrough_fact(ep) for ep in passthrough]
+
+    if not episodes:
+        # Nothing left for the model to read. Returning here is not just an
+        # optimisation: it is the common case for a Custodian sweep, and it
+        # keeps a scheduled hygiene run from spending model tokens restating
+        # claims that arrived already stated.
+        return DistillationResult(facts=passthrough_facts, episodes_considered=len(passthrough))
 
     valid_indices = {ep.index for ep in episodes}
     user_prompt = _render_user_prompt(episodes)
@@ -165,8 +220,8 @@ async def distill_session(
             break
 
     return DistillationResult(
-        facts=facts,
-        episodes_considered=len(episodes),
+        facts=passthrough_facts + facts,
+        episodes_considered=len(episodes) + len(passthrough),
         dropped_no_source=dropped_no_source,
         dropped_invalid=dropped_invalid,
     )

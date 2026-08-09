@@ -18,6 +18,11 @@ Three properties worth stating explicitly, because each is a real decision:
   < admin. `forget`, `revoke_source`, and `set_legal_hold` require admin.
   Treating erasure as just another write is the mistake this ordering exists
   to prevent.
+* **The trusted-on-arrival origins are bound to the credential, not declared
+  by the caller.** `system` and `operator` skip the corroboration gate
+  entirely (`docs/trust.md`: `has_trusted_source` is dispositive), so letting
+  a caller name its own provenance made the gate advisory. See
+  `Principal.may_declare`.
 """
 
 from __future__ import annotations
@@ -29,6 +34,7 @@ from enum import IntEnum
 from uuid import UUID
 
 import psycopg
+from mnemos_engine.models import SourceTrust
 
 KEY_PREFIX = "mn_live_"
 _TOKEN_BYTES = 32
@@ -68,6 +74,30 @@ class Principal:
 
     def can(self, required: Scope) -> bool:
         return self.scope >= required
+
+    def may_declare(self, trust: SourceTrust) -> bool:
+        """Whether this credential is allowed to claim `trust` as provenance.
+
+        `system` and `operator` are *trusted on arrival* — one such episode
+        makes `has_trusted_source` true, which promotes a fact to `trusted`
+        outright, no corroboration required (`docs/trust.md`). Before this
+        check existed, `source_trust` was simply an argument the caller
+        passed, and the caller on a write key is an LLM: a prompt injection
+        that reached an agent could tell it to record the injected claim as
+        `operator` and skip the corroboration gate entirely, in one call,
+        with no collusion at all. The tool descriptions asked the model not
+        to — and `docs/threat-model.md` says in the same breath that
+        prompt-level defenses fail eventually.
+
+        So the two trusted-on-arrival origins require ADMIN. `agent` and
+        `external` — the two that land `unverified` and must earn promotion
+        through the gate — stay freely declarable, because nothing is
+        gained by lying downward and the honest label is what makes
+        `revoke_source` able to find the contamination later.
+        """
+        if trust in (SourceTrust.SYSTEM, SourceTrust.OPERATOR):
+            return self.can(Scope.ADMIN)
+        return True
 
 
 class AuthError(Exception):

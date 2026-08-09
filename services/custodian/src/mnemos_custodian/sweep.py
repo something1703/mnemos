@@ -4,27 +4,35 @@ guidance, and persist structured findings.
 
 **How a finding becomes recallable memory — and why this module does not
 write `semantic_facts` directly.** Warn/critical findings are written back
-into the fabric as ordinary episodes (`event_type="ops_finding"`,
-`source_trust=SourceTrust.AGENT`) through a write-scoped `remember()` call —
-the exact same path any other agent uses, via `FactWriter`. From there, the
-*existing* sleep-cycle distillation pipeline (Phase 05) turns them into
-`semantic_facts` rows and runs them through the *same* corroboration gate
-every other agent-authored fact goes through: `trust='unverified'` on
-arrival, promoted only once two independent sweeps (different `session_id`,
-same `source_trust='agent'` — corroboration_count reaching 2 is what
-`determine_trust` needs) or a corroborating human/system observation agree.
-"Our own agent does not get to believe itself on the first pass" (PHASE_07
-7.3) falls out of reusing that gate rather than needing a bespoke rule here.
-A direct `semantic_facts` INSERT would duplicate the one place that gate is
-implemented — exactly the kind of second copy `mnemos_engine.corroboration`'s
-own docstring warns is how a security property quietly stops meaning what it
-claims to.
+into the fabric as ordinary episodes (`event_type="ops_finding"`) through a
+write-scoped `remember()` call — the exact same path any other agent uses,
+via `FactWriter`. From there the *existing* sleep-cycle pipeline (Phase 05)
+turns them into `semantic_facts` and runs them through the *same*
+corroboration gate every other fact goes through. A direct INSERT would
+duplicate the one place that gate is implemented — exactly the second copy
+`mnemos_engine.corroboration`'s docstring warns is how a security property
+quietly stops meaning what it claims to.
 
-**Known gap, stated rather than hidden:** which `fact_kind` the distillation
-model assigns an `ops_finding` episode has not been verified against the
-live distill prompt — `Finding.fact_id` stays `None` until a correlation
-step (matching a distilled fact back to the finding episode that produced
-it) exists. Tracked, not fabricated.
+**Two evidence classes, and why the distinction is load-bearing.** A sweep
+produces both deterministic readings (`cluster_state_finding` here,
+`check_backup_recency` in `cloud_api.py` — pure functions over control-plane
+data, no model) and model interpretations. Measurements enter as
+`source_trust='external'`, interpretations as `'agent'`. This is not a way
+for the Custodian to promote itself: `max_independent_corroborations` matches
+sessions against trust categories, so repeated `agent` sweeps stay pinned at
+corroboration_count=1 and `unverified` forever, however often they agree —
+verified live, and pinned by
+`tests/sleep_cycle/test_consolidate.py::test_repeated_agent_only_sweeps_never_promote_themselves`.
+What the split buys is that a measurement in one sweep and an interpretation
+in another are genuinely different evidence, which is what PHASE_07 7.3's
+"or a metric corroborates them" actually requires. Neither label is
+self-granted — the API binds `system`/`operator` to an admin key
+(`keys.py`'s `may_declare`), and both labels the Custodian can use are
+untrusted on arrival.
+
+Findings carry a `FindingCode` so the same condition seen twice produces
+byte-identical claim text; `FindingCode`'s own docstring has the similarity
+measurements that forced that design.
 """
 
 from __future__ import annotations
@@ -46,6 +54,8 @@ log = logging.getLogger("mnemos.custodian.sweep")
 
 _VALID_SEVERITIES = {"info", "warn", "critical"}
 
+_CODE_CHOICES = ", ".join(f'"{c}"' for c in findings.FindingCode)
+
 
 class FactWriter(Protocol):
     """The write-scoped path into semantic memory. A real implementation
@@ -57,7 +67,13 @@ class FactWriter(Protocol):
     """
 
     async def remember_ops_finding(
-        self, tenant_id: UUID, *, subject_key: str, content: str, session_id: UUID
+        self,
+        tenant_id: UUID,
+        *,
+        subject_key: str,
+        content: str,
+        session_id: UUID,
+        source_trust: str,
     ) -> UUID: ...
 
 
@@ -68,7 +84,13 @@ class McpFactWriter:
         self._client = api_mcp_client
 
     async def remember_ops_finding(
-        self, tenant_id: UUID, *, subject_key: str, content: str, session_id: UUID
+        self,
+        tenant_id: UUID,
+        *,
+        subject_key: str,
+        content: str,
+        session_id: UUID,
+        source_trust: str,
     ) -> UUID:
         result = await self._client.call_tool(
             "remember",
@@ -76,7 +98,7 @@ class McpFactWriter:
                 "subject_key": subject_key,
                 "content": content,
                 "event_type": "ops_finding",
-                "source_trust": "agent",
+                "source_trust": source_trust,
                 "session_id": str(session_id),
             },
         )
@@ -118,6 +140,39 @@ def _render_tool_result(result: Any) -> Any:
     return None
 
 
+def cluster_state_finding(tool_results: dict[str, Any]) -> findings.FindingDraft | None:
+    """The cluster's own reported state, read as a field — no model involved.
+
+    The interpreter also notices when a cluster is not RUNNING, and says so in
+    its own words. This function says so in the *same* words every time, from
+    the raw `get_cluster` payload, which is what makes the two genuinely
+    independent evidence for the corroboration gate rather than one opinion
+    stated twice: different pipeline, different `source_trust` (`external`
+    here vs `agent` there), same canonical claim.
+
+    Returns None when the state is RUNNING or simply absent — a check that
+    invents a finding from missing data would be worse than no check.
+    """
+    payload = tool_results.get("get_cluster")
+    if not isinstance(payload, dict):
+        return None
+    nested = payload.get("cluster")
+    cluster: dict[str, Any] = nested if isinstance(nested, dict) else payload
+    state = cluster.get("state")
+    if not isinstance(state, str) or state.upper() == "RUNNING":
+        return None
+    return findings.FindingDraft(
+        severity=findings.Severity.WARN,
+        summary=f"Cluster state reported by the control plane is {state!r}, not 'RUNNING'.",
+        evidence={"state": state, "cluster": cluster},
+        skill_id="reviewing-cluster-health",
+        tool_source=findings.ToolSource.MCP,
+        code=findings.FindingCode.CLUSTER_NOT_RUNNING,
+        measured=True,
+        recommendation="Confirm provisioning completed; contact support if it stays non-RUNNING.",
+    )
+
+
 async def _interpret(chat: ChatClient, skill: Skill, tool_results: dict[str, Any]) -> list[Any]:
     """One model call per skill per sweep. The skill's own body is the
     system-prompt context (its triage guidance, written by CockroachDB's own
@@ -134,7 +189,12 @@ async def _interpret(chat: ChatClient, skill: Skill, tool_results: dict[str, Any
         "report is a normal, healthy outcome, not a failure to find something.\n\n"
         "Respond with JSON: "
         '{"findings": [{"severity": "info"|"warn"|"critical", "summary": "...", '
-        '"evidence": {...}, "recommendation": "..." or null}]}\n\n'
+        '"evidence": {...}, "recommendation": "..." or null, "code": "..."}]}\n\n'
+        "`code` classifies the CONDITION so that the same condition observed "
+        "in a later sweep is recognised as the same one. Use exactly one of: "
+        f'{_CODE_CHOICES}. Use "other" when the finding genuinely does not '
+        "match any of them — do not force a fit, a wrong code is worse than "
+        '"other".\n\n'
         f"--- {skill.skill_id} triage guidance ---\n{skill.body}"
     )
     user = json.dumps({"skill_id": skill.skill_id, "tool_results": tool_results}, default=str)
@@ -159,6 +219,14 @@ async def _interpret(chat: ChatClient, skill: Skill, tool_results: dict[str, Any
             log.warning("dropping malformed finding from %s: %r", skill.skill_id, item)
             continue
         evidence = item.get("evidence")
+        try:
+            code = findings.FindingCode(item.get("code") or "other")
+        except ValueError:
+            # A code outside the enum is the model inventing vocabulary, which
+            # would silently split one condition into two identities. 'other'
+            # is the honest fallback.
+            log.info("unknown finding code %r from %s", item.get("code"), skill.skill_id)
+            code = findings.FindingCode.OTHER
         drafts.append(
             findings.FindingDraft(
                 severity=findings.Severity(severity),
@@ -166,6 +234,7 @@ async def _interpret(chat: ChatClient, skill: Skill, tool_results: dict[str, Any
                 evidence=evidence if isinstance(evidence, dict) else {"raw": evidence},
                 skill_id=skill.skill_id,
                 tool_source=findings.ToolSource.MCP,
+                code=code,
                 recommendation=item.get("recommendation")
                 if isinstance(item.get("recommendation"), str)
                 else None,
@@ -230,6 +299,12 @@ async def run_sweep(
         if not tool_results:
             continue
 
+        # Deterministic readings first: they cost no tokens and they are the
+        # half of the evidence that does not depend on the model's wording.
+        measured = cluster_state_finding(tool_results)
+        if measured is not None:
+            all_drafts.append(measured)
+
         all_drafts.extend(await _interpret(chat, skill, tool_results))
 
     if cloud_api is not None:
@@ -251,14 +326,32 @@ async def run_sweep(
     for finding in persisted:
         if not finding.severity.promotable:
             continue
-        content = finding.summary
+        # The canonical sentence when the condition is one we know, the
+        # model's own wording only when it is not. This is what makes "the
+        # same condition, seen twice" produce the same text twice, which is
+        # what the corroboration gate needs (FindingCode's docstring has the
+        # measurements that forced this).
+        content = finding.code.claim or finding.summary
         if finding.recommendation:
             content = f"{content} Recommendation: {finding.recommendation}"
+        # A measurement and an interpretation are genuinely different kinds of
+        # evidence, and the corroboration gate is built to notice exactly that:
+        # `max_independent_corroborations` matches sessions against source-trust
+        # categories, so a run of sweeps that all claim `agent` can never fill
+        # more than the one `agent` slot and stays `unverified` forever — which
+        # is correct, an agent must not promote itself by repetition. Labelling
+        # the deterministic readings `external` is not a loophole around that:
+        # `external` is untrusted on arrival too, and neither label is
+        # self-granted (the API binds `system`/`operator` to an admin key —
+        # keys.py's `may_declare`). It just stops the Custodian's own
+        # measurements from being misfiled as its opinions.
+        source_trust = "external" if finding.measured else "agent"
         await fact_writer.remember_ops_finding(
             tenant_id,
             subject_key=f"ops:{finding.skill_id}",
             content=content,
             session_id=session_id,
+            source_trust=source_trust,
         )
 
     status = findings.RunStatus.SUCCEEDED if checks_skipped == 0 else findings.RunStatus.PARTIAL

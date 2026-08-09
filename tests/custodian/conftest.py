@@ -45,7 +45,13 @@ class StubFactWriter:
         self.remembered: list[dict[str, Any]] = []
 
     async def remember_ops_finding(
-        self, tenant_id: uuid.UUID, *, subject_key: str, content: str, session_id: uuid.UUID
+        self,
+        tenant_id: uuid.UUID,
+        *,
+        subject_key: str,
+        content: str,
+        session_id: uuid.UUID,
+        source_trust: str,
     ) -> uuid.UUID:
         event_id = uuid.uuid4()
         self.remembered.append(
@@ -55,6 +61,7 @@ class StubFactWriter:
                 "content": content,
                 "session_id": session_id,
                 "event_id": event_id,
+                "source_trust": source_trust,
             }
         )
         return event_id

@@ -318,3 +318,144 @@ async def test_consolidate_contradiction_produces_contest(
         assert contested_with is not None
     assert rows[0][5] == rows[1][0]
     assert rows[1][5] == rows[0][0]
+
+
+async def test_custodian_findings_corroborate_across_sweeps_without_a_distiller(
+    db: Database, tenant: uuid.UUID, engine: MnemosEngine, embedder: Embedder, envelope: Envelope
+) -> None:
+    """PHASE_07 7.3's promotion rule, end to end — the regression test for two
+    bugs found by running the real sweep four times against the live cluster.
+
+    1. Distillation used to rewrite each `ops_finding` into a fresh paraphrase,
+       so four agreeing observations landed at 0.67-0.84 similarity and never
+       reinforced. `ops_finding` episodes now bypass the model entirely
+       (`distill.PASSTHROUGH_EVENT_TYPE`), so the same observation twice is the
+       same sentence twice. The ScriptedChat below carries NO distillation
+       responses at all — only the contradiction judge — which is what proves
+       the bypass: if either batch called the distiller, it would run dry.
+
+    2. Both sweeps used to write `source_trust='agent'`, and
+       `max_independent_corroborations` matches sessions against trust
+       categories, so N agent sweeps can only ever fill one slot: pinned at 1,
+       `unverified` forever. Measured readings now enter as `external`, so a
+       measurement in one sweep and an interpretation in another are genuinely
+       independent — CORROBORATED, and deliberately not TRUSTED, because
+       neither origin is system/operator.
+    """
+    subject = "ops:reviewing-cluster-health"
+    sweep_one, sweep_two = uuid.uuid4(), uuid.uuid4()
+    finding = "Cluster is not in the RUNNING state"
+
+    # Sweep 1: the deterministic control-plane reading (cloud_api.py's pure
+    # check), which is why it is `external` rather than the model's `agent`.
+    await remember_episode(
+        engine,
+        tenant,
+        subject_key=subject,
+        session_id=sweep_one,
+        content=finding,
+        source_trust=SourceTrust.EXTERNAL,
+        event_type="ops_finding",
+    )
+    # Sweep 2: the interpreter reaching the same conclusion from MCP output.
+    await remember_episode(
+        engine,
+        tenant,
+        subject_key=subject,
+        session_id=sweep_two,
+        content=finding,
+        source_trust=SourceTrust.AGENT,
+        event_type="ops_finding",
+    )
+
+    chat = ScriptedChat([{"contradictory": False, "reason": "the same observation"}])
+
+    def batch(session_id: uuid.UUID) -> SessionBatch:
+        return SessionBatch(
+            tenant_id=tenant,
+            session_id=session_id,
+            subject_key=subject,
+            home_region="us-east-1",
+            episode_count=1,
+        )
+
+    async def run(cur: psycopg.AsyncCursor, session_id: uuid.UUID):
+        return await consolidate_batch(
+            cur, batch(session_id), chat=chat, embedder=embedder, envelope=envelope, actor="test"
+        )
+
+    first = await db.transaction(
+        tenant, lambda cur: run(cur, sweep_one), label="consolidate_sweep_one"
+    )
+    assert first.facts_novel == 1
+
+    second = await db.transaction(
+        tenant, lambda cur: run(cur, sweep_two), label="consolidate_sweep_two"
+    )
+    assert second.facts_reinforced == 1, (
+        "the second sweep must land on the same fact, not a new one"
+    )
+
+    rows = await _fetch_facts(db, tenant, subject)
+    assert len(rows) == 1
+    _fact_id, trust, _strength, corroboration_count, _superseded, _contested = rows[0]
+    assert corroboration_count == 2
+    assert Trust(trust) is Trust.CORROBORATED, "a measurement plus an interpretation corroborate"
+
+
+async def test_repeated_agent_only_sweeps_never_promote_themselves(
+    db: Database, tenant: uuid.UUID, engine: MnemosEngine, embedder: Embedder, envelope: Envelope
+) -> None:
+    """The other half of the rule, and the more important one: the fix above
+    must NOT have handed the Custodian a way to believe itself. Three sweeps,
+    identical finding, all `agent` — they now correctly collapse onto one fact
+    (that is bug 1 fixed) and that fact stays `unverified` no matter how many
+    times the agent repeats itself, because every one of them competes for the
+    single `agent` slot."""
+    subject = "ops:profiling-statement-fingerprints"
+    finding = "One statement fingerprint dominates cluster CPU time"
+    sessions = [uuid.uuid4() for _ in range(3)]
+
+    for session_id in sessions:
+        await remember_episode(
+            engine,
+            tenant,
+            subject_key=subject,
+            session_id=session_id,
+            content=finding,
+            source_trust=SourceTrust.AGENT,
+            event_type="ops_finding",
+        )
+
+    chat = ScriptedChat(
+        [
+            {"contradictory": False, "reason": "same claim"},
+            {"contradictory": False, "reason": "same claim"},
+        ]
+    )
+
+    for session_id in sessions:
+
+        async def run(cur: psycopg.AsyncCursor, session_id: uuid.UUID = session_id):
+            return await consolidate_batch(
+                cur,
+                SessionBatch(
+                    tenant_id=tenant,
+                    session_id=session_id,
+                    subject_key=subject,
+                    home_region="us-east-1",
+                    episode_count=1,
+                ),
+                chat=chat,
+                embedder=embedder,
+                envelope=envelope,
+                actor="test",
+            )
+
+        await db.transaction(tenant, run, label="consolidate_agent_sweep")
+
+    rows = await _fetch_facts(db, tenant, subject)
+    assert len(rows) == 1, "identical findings must merge — that is bug 1 fixed"
+    _fact_id, trust, _strength, corroboration_count, _superseded, _contested = rows[0]
+    assert corroboration_count == 1, "three agent sweeps are one source, not three"
+    assert Trust(trust) is Trust.UNVERIFIED, "an agent must never corroborate itself"

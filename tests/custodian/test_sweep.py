@@ -10,6 +10,7 @@ from __future__ import annotations
 import uuid
 
 from mcp.server.mcpserver import MCPServer
+from mnemos_custodian import findings, sweep
 from mnemos_custodian.findings import RunStatus, TriggerSource
 from mnemos_custodian.mcp_client import CustodianMcpClient
 from mnemos_custodian.skills import Skill
@@ -379,3 +380,62 @@ async def test_sweep_skips_and_counts_a_failing_cloud_api_check(db, tenant: uuid
     assert status == str(RunStatus.PARTIAL)
     assert checks_skipped == 1
     assert "cloud_api" in skipped_detail
+
+
+def test_cluster_state_finding_is_a_field_read_not_an_interpretation() -> None:
+    """The measured half of the corroboration pair: no ChatClient argument
+    anywhere in the signature, so it cannot depend on the model's wording."""
+    draft = sweep.cluster_state_finding({"get_cluster": {"cluster": {"state": "CREATED"}}})
+    assert draft is not None
+    assert draft.measured is True
+    assert draft.code is findings.FindingCode.CLUSTER_NOT_RUNNING
+    assert "CREATED" in draft.summary
+
+
+def test_cluster_state_finding_accepts_an_unwrapped_payload() -> None:
+    draft = sweep.cluster_state_finding({"get_cluster": {"state": "CREATING"}})
+    assert draft is not None
+    assert draft.code is findings.FindingCode.CLUSTER_NOT_RUNNING
+
+
+def test_cluster_state_finding_is_silent_on_a_healthy_cluster() -> None:
+    assert sweep.cluster_state_finding({"get_cluster": {"state": "RUNNING"}}) is None
+    assert sweep.cluster_state_finding({"get_cluster": {"state": "running"}}) is None
+
+
+def test_cluster_state_finding_invents_nothing_from_missing_data() -> None:
+    """A check that fabricates a finding when the field is absent is worse
+    than no check — it would corroborate itself out of nothing."""
+    assert sweep.cluster_state_finding({}) is None
+    assert sweep.cluster_state_finding({"get_cluster": None}) is None
+    assert sweep.cluster_state_finding({"get_cluster": {"cluster": {}}}) is None
+
+
+def test_known_condition_uses_the_canonical_claim_not_the_models_wording() -> None:
+    """Two differently-worded findings for the same condition must remember
+    the SAME sentence — that identity is what the corroboration gate keys on,
+    and 0.9029-similar paraphrases were measured NOT to reinforce."""
+    a = findings.FindingDraft(
+        severity=findings.Severity.WARN,
+        summary="Cluster is not in the RUNNING state",
+        evidence={},
+        skill_id="reviewing-cluster-health",
+        tool_source=findings.ToolSource.MCP,
+        code=findings.FindingCode.CLUSTER_NOT_RUNNING,
+    )
+    b = findings.FindingDraft(
+        severity=findings.Severity.WARN,
+        summary="Basic cluster is not in the RUNNING state",
+        evidence={},
+        skill_id="reviewing-cluster-health",
+        tool_source=findings.ToolSource.MCP,
+        code=findings.FindingCode.CLUSTER_NOT_RUNNING,
+    )
+    assert a.code.claim == b.code.claim
+    assert a.code.claim is not None and a.summary != b.summary
+
+
+def test_other_falls_back_to_the_models_wording() -> None:
+    """Open-vocabulary findings keep the old behaviour, honestly — a template
+    cannot canonicalise a condition nobody enumerated."""
+    assert findings.FindingCode.OTHER.claim is None

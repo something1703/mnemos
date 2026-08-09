@@ -132,7 +132,8 @@ async def _fetch_episodes(
     cur: psycopg.AsyncCursor, batch: SessionBatch, *, envelope: Envelope
 ) -> list[EpisodeInput]:
     await cur.execute(
-        "SELECT event_id, occurred_at, content_ciphertext, content_dek_wrapped, source_trust "
+        "SELECT event_id, occurred_at, content_ciphertext, content_dek_wrapped, source_trust, "
+        "event_type "
         "FROM mnemos.episodic_events "
         "WHERE tenant_id = %s AND subject_key = %s AND session_id = %s "
         "AND consolidated_at IS NULL ORDER BY occurred_at",
@@ -140,7 +141,7 @@ async def _fetch_episodes(
     )
     episodes: list[EpisodeInput] = []
     for i, row in enumerate(await cur.fetchall(), start=1):
-        event_id, occurred_at, ciphertext, wrapped, source_trust = row
+        event_id, occurred_at, ciphertext, wrapped, source_trust, event_type = row
         try:
             content = envelope.decrypt(
                 bytes(ciphertext), bytes(wrapped), aad=row_aad(batch.tenant_id, batch.subject_key)
@@ -157,6 +158,7 @@ async def _fetch_episodes(
                 occurred_at=occurred_at,
                 content=content,
                 source_trust=SourceTrust(source_trust),
+                event_type=str(event_type),
             )
         )
     return episodes

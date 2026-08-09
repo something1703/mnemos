@@ -41,9 +41,13 @@ future recall, with unbounded blast radius over time.
   its output is trusted downstream); the contradiction judge; the Custodian's
   interpreter; learned skills.
 - **Controls:** content is delimited and declared as data in every prompt;
-  `source_trust` is mandatory; everything an LLM writes lands `unverified`; the
-  corroboration gate requires genuinely independent support; agent-authored
-  skills are quarantined by default.
+  `source_trust` is mandatory **and the two trusted-on-arrival origins are
+  bound to the credential, not declared by the caller** — an injected agent on
+  a write key cannot label its own claim `operator` and skip the gate
+  (`keys.py`'s `Principal.may_declare`, added 2026-08-10 after this exact
+  bypass was found; see docs/limits.md); everything an LLM writes lands
+  `unverified`; the corroboration gate requires genuinely independent support;
+  agent-authored skills are quarantined by default.
 - **Honest limit:** prompt-level defenses fail eventually. The real control is
   the gate, and the real containment is `revoke_source`. We publish the
   **collusion threshold** — how many independent-looking sources an attacker
