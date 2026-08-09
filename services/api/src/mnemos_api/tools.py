@@ -693,6 +693,8 @@ def _render_recall(result: Any) -> dict[str, Any]:
                 "text": s.fact.text,
                 "trust": str(s.fact.trust),
                 "home_region": s.fact.home_region,
+                "confidence": s.fact.confidence,
+                "corroboration_count": s.fact.corroboration_count,
                 "score": round(s.score, 6),
                 "score_breakdown": {
                     "similarity": round(s.breakdown.similarity, 6),
@@ -700,6 +702,14 @@ def _render_recall(result: Any) -> dict[str, Any]:
                     "confidence": s.breakdown.confidence,
                     "trust_weight": s.breakdown.trust_weight,
                 },
+                # Which episodes this fact traces back to — invariant 3, made
+                # inspectable. Event content is never included here (only the
+                # id); a caller wanting the text itself goes through
+                # explain(), which applies the same residency-aware
+                # projection rules recall() does everywhere else.
+                "provenance": [
+                    {"event_id": str(p.event_id), "weight": p.weight} for p in s.provenance
+                ],
             }
             for s in result.facts
         ],

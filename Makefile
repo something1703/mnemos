@@ -155,6 +155,10 @@ demo-deposition: ## Pillar II — temporal recall, deposition, offline verificat
 demo-resilience: ## Node kill, pipeline kill, Bedrock outage
 	bash demos/resilience.sh
 
+.PHONY: demo-sleep-cycle
+demo-sleep-cycle: ## Phase 05.7 — converse, consolidate, watch trust promote live
+	bash demos/sleep_demo.sh
+
 .PHONY: demo-all
 demo-all: demo-continuity demo-contagion demo-deposition ## All three, <12 min
 
