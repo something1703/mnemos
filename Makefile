@@ -218,6 +218,18 @@ deploy-sleep-cycle-fast: ## Redeploy config + smoke test without rebuilding the 
 logs-sleep-cycle: ## Tail the deployed sleep cycle's CloudWatch logs
 	aws logs tail /aws/lambda/mnemos-sleep-cycle --follow --format short
 
+.PHONY: deploy-custodian
+deploy-custodian: ## Build image, push, deploy ECS Fargate task + EventBridge schedule/alarm rules
+	bash infra/custodian/deploy.sh
+
+.PHONY: deploy-custodian-fast
+deploy-custodian-fast: ## Redeploy config + smoke test without rebuilding the image
+	SKIP_BUILD=1 bash infra/custodian/deploy.sh
+
+.PHONY: logs-custodian
+logs-custodian: ## Tail the deployed Custodian's CloudWatch logs
+	aws logs tail /ecs/mnemos-custodian --follow --format short
+
 .PHONY: smoke
 smoke: ## Prove a deployment works AND that its guarantees hold (exit != 0 on failure)
 	uv run python examples/clients/smoke.py

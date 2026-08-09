@@ -853,7 +853,6 @@ name = "mnemos-custodian"
 version = "0.1.0"
 source = { editable = "services/custodian" }
 dependencies = [
-    { name = "boto3" },
     { name = "httpx2" },
     { name = "mcp" },
     { name = "mnemos-engine" },
@@ -863,7 +862,6 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "boto3", specifier = ">=1.35" },
     { name = "httpx2", specifier = ">=2.5.0" },
     { name = "mcp", specifier = ">=2.0" },
     { name = "mnemos-engine", editable = "packages/engine" },

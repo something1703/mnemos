@@ -7,7 +7,6 @@ license = { text = "Apache-2.0" }
 dependencies = [
     "mnemos-engine",
     "mcp>=2.0",
-    "boto3>=1.35",
     "pydantic>=2.9",
     # Vendored SKILL.md files carry YAML frontmatter (name/description/
     # compatibility/metadata) — parsed for real rather than hand-rolled, since

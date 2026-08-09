@@ -198,6 +198,23 @@ print(json.dumps(d))' <<<"$SECRET_JSON")"
   aws lambda wait function-updated --function-name "$FUNCTION" --region "$REGION"
 fi
 
+# --- cloudwatch alarm --------------------------------------------------------
+# One of the three signals PHASE_07 7.6 wires to the Custodian's
+# alarm-triggered sweep — a p95 latency spike is exactly the kind of thing an
+# on-call engineer would want investigated (slow query? full table scan?
+# missing index?), which is what the Custodian's skills are for. 3 seconds
+# is a judgment call, not a measured SLO: generous enough not to page on
+# CockroachDB Cloud's normal tail latency, tight enough to catch a real
+# regression.
+say "Syncing CloudWatch alarm"
+aws cloudwatch put-metric-alarm --alarm-name "mnemos-api-p95-latency" --region "$REGION" \
+  --namespace AWS/Lambda --metric-name Duration \
+  --dimensions "Name=FunctionName,Value=${FUNCTION}" \
+  --extended-statistic p95 --period 300 --evaluation-periods 3 --threshold 3000 \
+  --comparison-operator GreaterThanThreshold --treat-missing-data notBreaching \
+  --alarm-description "API p95 latency over 3s for 15 minutes straight." \
+  >/dev/null
+
 # --- smoke test -------------------------------------------------------------
 say "Smoke test"
 HEALTH="$(curl -fsS --retry 5 --retry-all-errors --retry-delay 4 "${ENDPOINT}/health")"
@@ -219,8 +236,9 @@ if posture.get("api_can_delete"):
 PY
 
 say "Deployed"
-echo "  MCP   ${ENDPOINT}/mcp"
-echo "  REST  ${ENDPOINT}/v1/..."
+echo "  MCP    ${ENDPOINT}/mcp"
+echo "  REST   ${ENDPOINT}/v1/..."
+echo "  Alarm  mnemos-api-p95-latency"
 echo
 echo "Record it locally so the demos and client snippets point at the deployment:"
 echo "  MNEMOS_API_URL=${ENDPOINT}"

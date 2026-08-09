@@ -243,6 +243,21 @@ aws cloudwatch put-metric-alarm --alarm-name "mnemos-sleep-cycle-errors" --regio
   --alarm-description "Any sleep-cycle Lambda error in the last hour — consolidation, decay, or checkpoint failed and the caller (EventBridge or Step Functions) exhausted its retries." \
   >/dev/null
 
+# A dead man's switch, not a threshold on a value: the hourly-light schedule
+# calls _emit_consolidation_heartbeat() (lambda_handler.py) after every
+# successful consolidate/cycle stage. TreatMissingData=breaching means the
+# alarm fires when 6 straight hourly windows produce zero heartbeats — i.e.
+# consolidation has silently stopped succeeding, whether from an upstream
+# EventBridge misconfiguration, a stuck warm container, or anything else
+# that would NOT show up as a Lambda "Error" (mnemos-sleep-cycle-errors
+# already covers that case).
+aws cloudwatch put-metric-alarm --alarm-name "mnemos-sleep-cycle-consolidation-lag" --region "$REGION" \
+  --namespace "Mnemos/SleepCycle" --metric-name ConsolidationHeartbeat \
+  --statistic Sum --period 3600 --evaluation-periods 6 --threshold 1 \
+  --comparison-operator LessThanThreshold --treat-missing-data breaching \
+  --alarm-description "No successful consolidation heartbeat in 6 hours — consolidation has stopped making progress, whether or not it is also erroring." \
+  >/dev/null
+
 # --- smoke test -------------------------------------------------------------
 say "Smoke test: checkpoint stage (no model call, no cost)"
 RESULT="$(aws lambda invoke --function-name "$FUNCTION" --region "$REGION" \
@@ -261,4 +276,4 @@ say "Deployed"
 echo "  Function       ${LAMBDA_ARN}"
 echo "  State machine  ${SM_ARN}"
 echo "  Schedules      hourly-light, weekly-decay, hourly-checkpoint, nightly (-> state machine)"
-echo "  Alarm          mnemos-sleep-cycle-errors"
+echo "  Alarms         mnemos-sleep-cycle-errors, mnemos-sleep-cycle-consolidation-lag"

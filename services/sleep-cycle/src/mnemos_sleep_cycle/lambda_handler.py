@@ -79,6 +79,27 @@ _runtime: Runtime | None = None
 _loop: asyncio.AbstractEventLoop | None = None
 
 
+def _emit_consolidation_heartbeat() -> None:
+    """One data point per successful consolidation, so PHASE_07's
+    "consolidation lag" alarm (infra/sleep-cycle's own — a dead man's switch,
+    not a threshold on any value this service computes about itself) has
+    something real to watch: `TreatMissingData=breaching` over a 6-hour
+    window means the alarm fires when consolidation has silently stopped
+    running, not just when it errors (already covered by
+    mnemos-sleep-cycle-errors). Best-effort — a failed metric write must
+    never fail the consolidation it is reporting on.
+    """
+    try:
+        import boto3
+
+        boto3.client("cloudwatch").put_metric_data(
+            Namespace="Mnemos/SleepCycle",
+            MetricData=[{"MetricName": "ConsolidationHeartbeat", "Value": 1, "Unit": "Count"}],
+        )
+    except Exception:
+        log.warning("failed to emit consolidation heartbeat metric", exc_info=True)
+
+
 def _get_loop() -> asyncio.AbstractEventLoop:
     """One event loop per execution environment, not per invocation — see the
     module docstring for why `asyncio.run()` here would silently break pool
@@ -101,13 +122,16 @@ async def _dispatch(event: dict[str, Any]) -> dict[str, Any]:
     runtime = await _get_runtime()
 
     if stage == "consolidate":
-        return await run_consolidation(runtime, limit=event.get("limit"))
+        result = await run_consolidation(runtime, limit=event.get("limit"))
+        _emit_consolidation_heartbeat()
+        return result
     if stage == "decay":
         return await run_decay(runtime)
     if stage == "checkpoint":
         return await run_checkpoint(runtime)
     if stage == "cycle":
         consolidation = await run_consolidation(runtime)
+        _emit_consolidation_heartbeat()
         checkpoint = await run_checkpoint(runtime)
         return {"consolidation": consolidation, "checkpoint": checkpoint}
 
