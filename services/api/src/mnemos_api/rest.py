@@ -499,4 +499,162 @@ def build_rest_app(runtime: Runtime) -> FastAPI:
             )
         }
 
+    @app.get("/v1/custodian/runs", tags=["custodian"])
+    async def custodian_runs(
+        principal: CurrentPrincipal,
+        limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    ) -> dict[str, Any]:
+        """Sweep history, including what each run could NOT check.
+
+        `checks_skipped` and `skipped_detail` are returned alongside the
+        successes for the same reason the crossings log includes denials:
+        a coverage report that lists only what it managed to look at reads as
+        full coverage, which is exactly the failure mode PHASE_07 7.1 calls
+        out.
+        """
+        require(principal, Scope.READ, "custodian_runs")
+
+        async def run(cur: Any) -> list[dict[str, Any]]:
+            await cur.execute(
+                "SELECT run_id, trigger_source, trigger_detail, started_at, finished_at, "
+                "       status, skills_run, checks_run, checks_skipped, skipped_detail "
+                "FROM mnemos.custodian_runs WHERE tenant_id = %s "
+                "ORDER BY started_at DESC LIMIT %s",
+                (principal.tenant_id, limit),
+            )
+            return [
+                {
+                    "run_id": str(r[0]),
+                    "trigger_source": r[1],
+                    "trigger_detail": r[2],
+                    "started_at": r[3].isoformat(),
+                    "finished_at": r[4].isoformat() if r[4] else None,
+                    "status": r[5],
+                    "skills_run": r[6],
+                    "checks_run": r[7],
+                    "checks_skipped": r[8],
+                    "skipped_detail": r[9],
+                }
+                for r in await cur.fetchall()
+            ]
+
+        return {
+            "runs": await runtime.db.transaction(
+                principal.tenant_id, run, label="rest_custodian_runs", read_only=True
+            )
+        }
+
+    @app.get("/v1/custodian/findings", tags=["custodian"])
+    async def custodian_findings(
+        principal: CurrentPrincipal,
+        run_id: UUID | None = None,
+        severity: str | None = None,
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    ) -> dict[str, Any]:
+        """Findings, carrying both provenance axes the console needs.
+
+        `tool_source` says which CockroachDB surface produced the data (the
+        Cloud MCP Server or the control-plane API), and `measured` says
+        whether the finding is a deterministic reading or the interpreter's
+        opinion. Those are different questions, and collapsing them would
+        hide the distinction that makes a Custodian finding corroborable at
+        all — see mnemos_custodian.sweep.
+        """
+        require(principal, Scope.READ, "custodian_findings")
+
+        async def run(cur: Any) -> list[dict[str, Any]]:
+            # Static SQL with nullable predicates rather than a WHERE clause
+            # assembled from strings. The assembled version is equivalent here
+            # (the fragments are literals; only values are bound) and is what
+            # /v1/facts above still does — but ADR-011's whole position is that
+            # the injection-shaped SURFACE is the thing worth removing, not
+            # just the injection. A query with no interpolation needs no
+            # reader to verify that claim, and no suppression comment to
+            # silence the linter that would otherwise keep asking.
+            await cur.execute(
+                "SELECT finding_id, run_id, severity, summary, evidence, recommendation, "
+                "       skill_id, tool_source, code, measured, fact_id, created_at "
+                "FROM mnemos.custodian_findings "
+                "WHERE tenant_id = %(tenant)s "
+                "  AND (%(run_id)s::UUID IS NULL OR run_id = %(run_id)s) "
+                "  AND (%(severity)s::STRING IS NULL OR severity = %(severity)s) "
+                "ORDER BY created_at DESC LIMIT %(limit)s",
+                {
+                    "tenant": principal.tenant_id,
+                    "run_id": run_id,
+                    "severity": severity,
+                    "limit": limit,
+                },
+            )
+            return [
+                {
+                    "finding_id": str(r[0]),
+                    "run_id": str(r[1]),
+                    "severity": r[2],
+                    "summary": r[3],
+                    "evidence": r[4],
+                    "recommendation": r[5],
+                    "skill_id": r[6],
+                    "tool_source": r[7],
+                    "code": r[8],
+                    "measured": bool(r[9]),
+                    "fact_id": str(r[10]) if r[10] else None,
+                    "created_at": r[11].isoformat(),
+                }
+                for r in await cur.fetchall()
+            ]
+
+        return {
+            "findings": await runtime.db.transaction(
+                principal.tenant_id, run, label="rest_custodian_findings", read_only=True
+            )
+        }
+
+    @app.get("/v1/governance/proposals", tags=["governance"])
+    async def governance_proposals(
+        principal: CurrentPrincipal,
+        status: str | None = None,
+        limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    ) -> dict[str, Any]:
+        """What the Custodian has asked a human to decide.
+
+        Read-only here on purpose. Approving a proposal is a Warden operation
+        behind an admin scope and dual control — it is deliberately not
+        reachable by adding a verb to this endpoint.
+        """
+        require(principal, Scope.READ, "governance_proposals")
+
+        async def run(cur: Any) -> list[dict[str, Any]]:
+            await cur.execute(
+                "SELECT proposal_id, proposed_by, kind, target, rationale, evidence, "
+                "       status, decided_by, decided_at, decision_note, created_at "
+                "FROM mnemos.governance_proposals "
+                "WHERE tenant_id = %(tenant)s "
+                "  AND (%(status)s::STRING IS NULL OR status = %(status)s) "
+                "ORDER BY created_at DESC LIMIT %(limit)s",
+                {"tenant": principal.tenant_id, "status": status, "limit": limit},
+            )
+            return [
+                {
+                    "proposal_id": str(r[0]),
+                    "proposed_by": r[1],
+                    "kind": r[2],
+                    "target": r[3],
+                    "rationale": r[4],
+                    "evidence": r[5],
+                    "status": r[6],
+                    "decided_by": r[7],
+                    "decided_at": r[8].isoformat() if r[8] else None,
+                    "decision_note": r[9],
+                    "created_at": r[10].isoformat(),
+                }
+                for r in await cur.fetchall()
+            ]
+
+        return {
+            "proposals": await runtime.db.transaction(
+                principal.tenant_id, run, label="rest_proposals", read_only=True
+            )
+        }
+
     return app

@@ -79,10 +79,12 @@ async function Results({
   }
 
   const facts = result.facts ?? [];
-  const withheld = result.withheld ?? null;
-  const withheldTotal = withheld
-    ? Object.values(withheld).reduce<number>((sum, n) => sum + (n ?? 0), 0)
-    : 0;
+  const withheld: [string, number][] = [
+    ["unverified", result.unverified_withheld ?? 0],
+    ["withheld by residency", result.residency_withheld ?? 0],
+  ].filter((entry): entry is [string, number] => (entry[1] as number) > 0);
+  const withheldTotal = withheld.reduce((sum, [, n]) => sum + n, 0);
+  const contested = result.contested ?? [];
 
   return (
     <div className="flex flex-col gap-4">
@@ -95,12 +97,9 @@ async function Results({
               {withheldTotal} result{withheldTotal === 1 ? "" : "s"} withheld
             </span>
             <span className="text-moonstone">
-              {Object.entries(withheld ?? {})
-                .filter(([, n]) => n)
-                .map(([reason, n]) => `${n} ${reason}`)
-                .join(" · ")}
+              {withheld.map(([reason, n]) => `${n} ${reason}`).join(" · ")}
             </span>
-            {!includeUnverified && withheld?.unverified ? (
+            {!includeUnverified && (result.unverified_withheld ?? 0) > 0 ? (
               <Link
                 href={`/explorer?q=${encodeURIComponent(query)}&unverified=1`}
                 className="ml-auto text-xs text-synapse hover:underline"
@@ -122,6 +121,7 @@ async function Results({
           <p className="text-xs text-dim">
             {facts.length} fact{facts.length === 1 ? "" : "s"}, ranked by similarity × strength ×
             confidence × trust
+            {contested.length > 0 ? ` · ${contested.length} contested and flagged` : ""}
           </p>
           <div className="flex flex-col gap-3">
             {facts.map((fact) => (

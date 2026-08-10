@@ -35,7 +35,11 @@ export function apiConfigured(): boolean {
  */
 export async function apiGet<T>(
   path: string,
-  { key = READ_KEY, revalidate = 4 }: { key?: string; revalidate?: number | false } = {},
+  {
+    key = READ_KEY,
+    revalidate = 4,
+    raw = false,
+  }: { key?: string; revalidate?: number | false; raw?: boolean } = {},
 ): Promise<T> {
   if (!BASE) {
     throw new ApiError("MNEMOS_API_URL is not set — copy .env.example and fill it in", 500);
@@ -52,5 +56,8 @@ export async function apiGet<T>(
       response.status,
     );
   }
+  // `raw` is for the deposition export, which is HTML by design — parsing it
+  // as JSON would throw on a response that is perfectly valid.
+  if (raw) return (await response.text()) as T;
   return (await response.json()) as T;
 }

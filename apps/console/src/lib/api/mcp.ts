@@ -41,9 +41,16 @@ export interface RecalledFact {
 
 export interface RecallResult {
   facts: RecalledFact[];
-  withheld?: { unverified?: number; quarantined?: number; residency?: number } | null;
-  recall_id?: string | null;
-  [key: string]: unknown;
+  /** Flat counts, matching what the tool actually returns. An earlier guess at
+   * a nested `withheld` object type-checked fine and silently never rendered,
+   * because TypeScript cannot check a shape it was told about rather than
+   * shown. These names were read off a live response. */
+  unverified_withheld: number;
+  residency_withheld: number;
+  contested: RecalledFact[];
+  /** Plural: one recall may be cited by a later action, and `record_action`
+   * takes the list. This is the link the deposition walks backwards. */
+  recall_ids: string[];
 }
 
 /**
