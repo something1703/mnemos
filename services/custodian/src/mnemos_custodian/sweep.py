@@ -331,9 +331,17 @@ async def run_sweep(
         # same condition, seen twice" produce the same text twice, which is
         # what the corroboration gate needs (FindingCode's docstring has the
         # measurements that forced this).
+        #
+        # The recommendation is deliberately NOT appended. Measured live: with
+        # it, four sweeps of the same condition produced one canonical claim
+        # with four different advice sentences glued on, and only two of them
+        # ever reinforced — the free text dragged similarity back under 0.92
+        # and re-introduced exactly the drift the code was added to remove. It
+        # also does not belong in a claim: "the cluster is not RUNNING" is a
+        # statement about the world that can be corroborated, while "contact
+        # support" is advice that cannot. The recommendation is already stored
+        # on the finding row, which is where the console reads it from.
         content = finding.code.claim or finding.summary
-        if finding.recommendation:
-            content = f"{content} Recommendation: {finding.recommendation}"
         # A measurement and an interpretation are genuinely different kinds of
         # evidence, and the corroboration gate is built to notice exactly that:
         # `max_independent_corroborations` matches sessions against source-trust

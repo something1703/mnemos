@@ -11,7 +11,7 @@ import uuid
 
 from mcp.server.mcpserver import MCPServer
 from mnemos_custodian import findings, sweep
-from mnemos_custodian.findings import RunStatus, TriggerSource
+from mnemos_custodian.findings import FindingCode, RunStatus, TriggerSource
 from mnemos_custodian.mcp_client import CustodianMcpClient
 from mnemos_custodian.skills import Skill
 from mnemos_custodian.sweep import run_sweep
@@ -439,3 +439,58 @@ def test_other_falls_back_to_the_models_wording() -> None:
     """Open-vocabulary findings keep the old behaviour, honestly — a template
     cannot canonicalise a condition nobody enumerated."""
     assert findings.FindingCode.OTHER.claim is None
+
+
+async def test_remembered_claim_is_canonical_and_excludes_the_recommendation(
+    db, tenant: uuid.UUID
+) -> None:
+    """What reaches memory is the condition, not the advice.
+
+    Both halves are measured behaviour, not taste. The canonical claim is what
+    makes the same condition seen twice produce the same sentence twice, which
+    is what `revise.REINFORCE_THRESHOLD` (0.92) needs — free-text summaries of
+    one cluster state scored 0.88-0.90 and would not have merged. And the
+    recommendation is excluded because appending it put the model's varying
+    advice back into the claim and undid exactly that: live, four sweeps of one
+    condition produced four different glued-on sentences and only two ever
+    reinforced. Advice also is not corroborable — "contact support" is not a
+    statement about the world that a second observation can confirm.
+    """
+    chat = ScriptedChat(
+        [
+            {
+                "findings": [
+                    {
+                        "severity": "warn",
+                        "summary": "the basic cluster seems to still be coming up",
+                        "evidence": {},
+                        "recommendation": "Check provisioning and contact support.",
+                        "code": "cluster_not_running",
+                    }
+                ]
+            }
+        ]
+    )
+    fact_writer = StubFactWriter()
+
+    async def run(cur):
+        async with CustodianMcpClient(_fake_cloud_mcp_server()) as mcp:
+            return await run_sweep(
+                cur,
+                tenant,
+                trigger_source=TriggerSource.MANUAL,
+                trigger_detail=None,
+                skills=_one_skill(),
+                mcp=mcp,
+                chat=chat,
+                fact_writer=fact_writer,
+                session_id=uuid.uuid4(),
+                database="mnemos",
+            )
+
+    await db.transaction(tenant, run, label="sweep")
+
+    content = fact_writer.remembered[0]["content"]
+    assert content == FindingCode.CLUSTER_NOT_RUNNING.claim
+    assert "contact support" not in content.lower()
+    assert "seems to still be coming up" not in content, "the model's wording must not leak in"

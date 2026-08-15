@@ -12,6 +12,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { TraceFooter } from "@/components/trace-footer";
+import { TenantSwitcher } from "@/components/tenant-switcher";
+import { activeTenant, tenantsWithKeys } from "@/lib/api/tenants";
 
 /**
  * The Shell: nav rail plus the live memory-trace footer.
@@ -37,7 +39,8 @@ const DESTRUCTIVE_NAV = [
   { href: "/forget", label: "Forget", icon: Trash2 },
 ] as const;
 
-export function Shell({ children }: { children: React.ReactNode }) {
+export async function Shell({ children }: { children: React.ReactNode }) {
+  const [tenants, active] = await Promise.all([tenantsWithKeys(), activeTenant()]);
   return (
     <div className="flex min-h-screen flex-col">
       <div className="flex flex-1">
@@ -49,6 +52,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <Boxes className="size-5 text-synapse" aria-hidden />
             <span className="font-display text-lg tracking-[-0.02em] text-parchment">Mnemos</span>
           </Link>
+
+          <TenantSwitcher tenants={[...tenants]} active={active} />
 
           {NAV.map(({ href, label, icon: Icon }) => (
             <NavLink key={href} href={href} label={label} Icon={Icon} />
