@@ -58,6 +58,11 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["S", "DTZ"]
 "redteam/**" = ["S"]  # the attack suite is supposed to look like this
+# The homoglyph payload is made of Cyrillic and Greek lookalikes on purpose —
+# RUF001/2/3 flagging them as "ambiguous" is the linter correctly identifying
+# the attack. Scoped to the corpus file so the rule keeps firing everywhere
+# a confusable would be an accident rather than a test case.
+"redteam/poison/payloads.py" = ["RUF001", "RUF002", "RUF003"]
 # The probe interpolates one module-level constant (SCRATCH_SCHEMA) into static
 # DDL. No user input reaches these strings. This exemption is scoped to the one
 # file that needs it rather than relaxed globally — S608 must keep firing
@@ -111,6 +116,7 @@ markers = [
     "security: adversarial isolation and attack-surface tests",
     "slow: excluded from the default PR run",
     "llm: calls a real model API and spends real money — run explicitly, not on every PR",
+    "redteam: an attack from the Phase 10 suite (redteam/), run against redteam-* tenants",
 ]
 
 [tool.coverage.report]
