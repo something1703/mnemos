@@ -233,3 +233,15 @@ logs-custodian: ## Tail the deployed Custodian's CloudWatch logs
 .PHONY: smoke
 smoke: ## Prove a deployment works AND that its guarantees hold (exit != 0 on failure)
 	uv run python examples/clients/smoke.py
+
+.PHONY: console-dev
+console-dev: ## Run the console locally against the deployed API
+	cd apps/console && pnpm dev
+
+.PHONY: console-check
+console-check: ## Typecheck, lint and production-build the console
+	cd apps/console && pnpm typecheck && pnpm lint && pnpm build
+
+.PHONY: deploy-console
+deploy-console: ## Deploy the console to Vercel (requires `vercel link` once)
+	cd apps/console && pnpm dlx vercel@latest --prod
