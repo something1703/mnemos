@@ -17,7 +17,7 @@ export function ActionForm({ actionId }: { actionId: string }) {
         event.preventDefault();
         const next = value.trim();
         startTransition(() =>
-          router.push(next ? `/deposition?action=${encodeURIComponent(next)}` : "/deposition"),
+          router.push(next ? `/console/deposition?action=${encodeURIComponent(next)}` : "/console/deposition"),
         );
       }}
     >

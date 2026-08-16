@@ -45,5 +45,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# generated from brand/tokens.css by scripts/sync-brand.mjs
+# generated from brand/ by scripts/sync-brand.mjs
 src/app/brand.generated.css
+src/app/icon.svg
+public/brand/

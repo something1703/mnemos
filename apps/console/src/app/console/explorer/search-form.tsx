@@ -27,7 +27,7 @@ export function SearchForm({
     const params = new URLSearchParams();
     if (value.trim()) params.set("q", value.trim());
     if (nextUnverified) params.set("unverified", "1");
-    startTransition(() => router.push(`/explorer?${params.toString()}`));
+    startTransition(() => router.push(`/console/explorer?${params.toString()}`));
   }
 
   return (

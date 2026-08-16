@@ -1,7 +1,7 @@
 import Link from "next/link";
 import {
   Activity,
-  Boxes,
+  ArrowUpRight,
   Clock,
   FileSearch,
   Globe2,
@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { TraceFooter } from "@/components/trace-footer";
 import { TenantSwitcher } from "@/components/tenant-switcher";
+import { NavLink } from "@/components/nav-link";
+import { Logo } from "@/components/ui/logo";
 import { activeTenant, tenantsWithKeys } from "@/lib/api/tenants";
 
 /**
@@ -25,18 +27,18 @@ import { activeTenant, tenantsWithKeys } from "@/lib/api/tenants";
  * of "Overview".
  */
 const NAV = [
-  { href: "/", label: "Overview", icon: Activity },
-  { href: "/explorer", label: "Memory Explorer", icon: Search },
-  { href: "/time-machine", label: "Time Machine", icon: Clock },
-  { href: "/residency", label: "Residency", icon: Globe2 },
-  { href: "/ledger", label: "Ledger", icon: Link2 },
-  { href: "/custodian", label: "Custodian", icon: Radar },
-  { href: "/deposition", label: "Deposition", icon: FileSearch },
+  { href: "/console", label: "Overview", icon: Activity },
+  { href: "/console/explorer", label: "Memory Explorer", icon: Search },
+  { href: "/console/time-machine", label: "Time Machine", icon: Clock },
+  { href: "/console/residency", label: "Residency", icon: Globe2 },
+  { href: "/console/ledger", label: "Ledger", icon: Link2 },
+  { href: "/console/custodian", label: "Custodian", icon: Radar },
+  { href: "/console/deposition", label: "Deposition", icon: FileSearch },
 ] as const;
 
 const DESTRUCTIVE_NAV = [
-  { href: "/blast-radius", label: "Blast Radius", icon: ShieldAlert },
-  { href: "/forget", label: "Forget", icon: Trash2 },
+  { href: "/console/blast-radius", label: "Blast Radius", icon: ShieldAlert },
+  { href: "/console/forget", label: "Forget", icon: Trash2 },
 ] as const;
 
 export async function Shell({ children }: { children: React.ReactNode }) {
@@ -48,15 +50,21 @@ export async function Shell({ children }: { children: React.ReactNode }) {
           aria-label="Primary"
           className="hidden w-56 shrink-0 flex-col gap-1 border-r border-hairline bg-veil/40 px-3 py-4 md:flex"
         >
-          <Link href="/" className="mb-4 flex items-center gap-2 px-2">
-            <Boxes className="size-5 text-synapse" aria-hidden />
+          <Link href="/console" className="mb-1 flex items-center gap-2 px-2">
+            <Logo size={22} className="text-synapse" />
             <span className="font-display text-lg tracking-[-0.02em] text-parchment">Mnemos</span>
+          </Link>
+          <Link
+            href="/"
+            className="mb-4 flex items-center gap-1 px-2 text-[11px] text-dim transition-colors hover:text-moonstone"
+          >
+            mnemos.dev <ArrowUpRight className="size-3" aria-hidden />
           </Link>
 
           <TenantSwitcher tenants={[...tenants]} active={active} />
 
           {NAV.map(({ href, label, icon: Icon }) => (
-            <NavLink key={href} href={href} label={label} Icon={Icon} />
+            <NavLink key={href} href={href} label={label} icon={<Icon className="size-4" aria-hidden />} />
           ))}
 
           <div className="my-3 border-t border-hairline" />
@@ -64,7 +72,7 @@ export async function Shell({ children }: { children: React.ReactNode }) {
             Irreversible
           </p>
           {DESTRUCTIVE_NAV.map(({ href, label, icon: Icon }) => (
-            <NavLink key={href} href={href} label={label} Icon={Icon} />
+            <NavLink key={href} href={href} label={label} icon={<Icon className="size-4" aria-hidden />} />
           ))}
         </nav>
 
@@ -73,25 +81,5 @@ export async function Shell({ children }: { children: React.ReactNode }) {
 
       <TraceFooter />
     </div>
-  );
-}
-
-function NavLink({
-  href,
-  label,
-  Icon,
-}: {
-  href: string;
-  label: string;
-  Icon: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
-}) {
-  return (
-    <Link
-      href={href}
-      className="flex items-center gap-2.5 rounded px-2 py-1.5 text-sm text-moonstone transition-colors hover:bg-veil-hi hover:text-parchment"
-    >
-      <Icon className="size-4" aria-hidden />
-      {label}
-    </Link>
   );
 }

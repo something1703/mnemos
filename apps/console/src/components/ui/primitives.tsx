@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 import { ACCENT_CLASSES, SEVERITY_PRESENTATION, type Severity } from "@/lib/brand";
@@ -147,9 +148,16 @@ export function Button({
   className,
   variant,
   size,
+  asChild = false,
   ...props
-}: React.ComponentProps<"button"> & VariantProps<typeof buttonVariants>) {
-  return <button className={cn(buttonVariants({ variant, size }), className)} {...props} />;
+}: React.ComponentProps<"button"> &
+  VariantProps<typeof buttonVariants> & { asChild?: boolean }) {
+  // asChild renders the button's classes onto its child (typically a
+  // next/link `<a>`) instead of wrapping it in a `<button>` — a link that
+  // looks like a button should still navigate like a link, not sit inside
+  // one and fight it for the click.
+  const Comp = asChild ? Slot : "button";
+  return <Comp className={cn(buttonVariants({ variant, size }), className)} {...props} />;
 }
 
 /* ----------------------------------------------------------- EmptyState --- */

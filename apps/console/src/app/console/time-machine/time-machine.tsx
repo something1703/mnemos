@@ -54,7 +54,7 @@ export function TimeMachine({
     if (nextOffset > 0) {
       params.set("t", new Date(Date.now() - nextOffset * 1000).toISOString());
     }
-    startTransition(() => router.push(`/time-machine?${params.toString()}`));
+    startTransition(() => router.push(`/console/time-machine?${params.toString()}`));
   }
 
   const diff = useMemo(() => computeDiff(now?.facts ?? [], past?.facts ?? []), [now, past]);

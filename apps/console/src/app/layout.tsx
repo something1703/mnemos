@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Albert_Sans, Bricolage_Grotesque, Spline_Sans_Mono } from "next/font/google";
 import "./globals.css";
-import { Shell } from "@/components/shell";
 
 /* The three families BRAND.md locks. Loaded through next/font so they are
  * self-hosted and subset at build time — no layout shift, no third-party
@@ -22,18 +21,26 @@ const spline = Spline_Sans_Mono({
   display: "swap",
 });
 
+const TITLE = "Mnemos — accountable memory for agents";
+const DESCRIPTION =
+  "Memory tiers, the trust lattice, physical residency, the living audit chain, and erasure with proof.";
+
 export const metadata: Metadata = {
-  title: "Mnemos — accountable memory for agents",
-  description:
-    "Memory tiers, the trust lattice, physical residency, the living audit chain, and erasure with proof.",
+  title: { default: TITLE, template: "%s · Mnemos" },
+  description: DESCRIPTION,
+  openGraph: { title: TITLE, description: DESCRIPTION, type: "website" },
+  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
 };
 
+/**
+ * No `<Shell>` here — that is `/console`'s own layout now. This root only
+ * carries what every page needs regardless of whether it is the marketing
+ * site or the dashboard: fonts and the brand stylesheet.
+ */
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${bricolage.variable} ${albert.variable} ${spline.variable}`}>
-      <body>
-        <Shell>{children}</Shell>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

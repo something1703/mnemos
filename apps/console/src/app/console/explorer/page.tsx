@@ -50,7 +50,7 @@ export default async function ExplorerPage({
         <EmptyState title="Ask a question to see what memory answers">
           Recall is hybrid — vector similarity and lexical match, re-ranked by how much the system
           actually believes each fact. Try{" "}
-          <Link href="/explorer?q=is+the+database+cluster+healthy%3F" className="text-synapse hover:underline">
+          <Link href="/console/explorer?q=is+the+database+cluster+healthy%3F" className="text-synapse hover:underline">
             “is the database cluster healthy?”
           </Link>{" "}
           to see the Custodian&rsquo;s own corroborated finding come back.
@@ -101,7 +101,7 @@ async function Results({
             </span>
             {!includeUnverified && (result.unverified_withheld ?? 0) > 0 ? (
               <Link
-                href={`/explorer?q=${encodeURIComponent(query)}&unverified=1`}
+                href={`/console/explorer?q=${encodeURIComponent(query)}&unverified=1`}
                 className="ml-auto text-xs text-synapse hover:underline"
               >
                 Show unverified too →

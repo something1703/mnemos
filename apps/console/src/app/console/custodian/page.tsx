@@ -148,7 +148,7 @@ export default async function CustodianPage({
           <CardHeader>
             <CardTitle>Sweeps</CardTitle>
             {selectedRun ? (
-              <Link href="/custodian" className="text-xs text-synapse hover:underline">
+              <Link href="/console/custodian" className="text-xs text-synapse hover:underline">
                 Clear
               </Link>
             ) : null}
