@@ -30,6 +30,23 @@ const ACCENT_BG = {
   umbra: "bg-umbra",
 } as const;
 
+/** The pillar spine ignites on hover instead of sitting lit all the time —
+ * the same "current" glow the trust lattice below gives its active node
+ * (`filter: drop-shadow`, not a box-shadow standing in for elevation), so
+ * hovering a pillar reads as the same family of motion as watching a state
+ * light up in the lattice, not a second unrelated effect. */
+const PILLAR_LINE_HOVER = {
+  synapse: "group-hover:bg-synapse",
+  ember: "group-hover:bg-ember",
+  signal: "group-hover:bg-signal",
+} as const;
+
+const PILLAR_DOT_HOVER = {
+  synapse: "group-hover:bg-synapse group-hover:[filter:drop-shadow(0_0_8px_var(--synapse))]",
+  ember: "group-hover:bg-ember group-hover:[filter:drop-shadow(0_0_8px_var(--ember))]",
+  signal: "group-hover:bg-signal group-hover:[filter:drop-shadow(0_0_8px_var(--signal))]",
+} as const;
+
 const PLANES = [
   {
     name: "The Fabric",
@@ -276,18 +293,24 @@ export default async function LandingPage() {
           <h2 className="mb-16 font-display text-2xl tracking-[-0.02em] text-parchment md:text-3xl">
             Three pillars
           </h2>
-          <div className="relative grid gap-10 md:grid-cols-3 md:gap-8">
-            <div aria-hidden className="absolute inset-x-0 top-0 hidden h-px bg-hairline md:block" />
+          <div className="grid gap-10 md:grid-cols-3 md:gap-8">
             {PILLARS.map((p) => (
               <Link key={p.title} href={p.href} className="group relative flex flex-col gap-2.5">
-                {/* A solid dot, painted after the spine in DOM order, covers
-                    the 1px line beneath it — no color-matched ring needed to
-                    fake a cutout against a translucent section background. */}
+                {/* Each pillar owns its own segment of the spine rather than
+                    sharing one full-width line — hovering one pillar lights
+                    only its own node and its own stretch of hairline. */}
                 <span
                   aria-hidden
                   className={cn(
-                    "absolute -top-[29px] left-0 hidden size-3 rounded-full md:block",
-                    ACCENT_BG[p.accent],
+                    "absolute -top-8 left-0 hidden h-px w-full bg-hairline transition-colors duration-300 md:block",
+                    PILLAR_LINE_HOVER[p.accent],
+                  )}
+                />
+                <span
+                  aria-hidden
+                  className={cn(
+                    "absolute -top-[33px] left-0 hidden size-3 rounded-full bg-moonstone/40 transition-all duration-300 md:block",
+                    PILLAR_DOT_HOVER[p.accent],
                   )}
                 />
                 <p.icon className={cn("size-5", ICON_ACCENT_CLASS[p.accent])} aria-hidden />
