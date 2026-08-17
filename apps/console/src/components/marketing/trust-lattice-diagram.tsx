@@ -9,6 +9,7 @@ import {
   type Node,
   type Edge,
   type NodeProps,
+  type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { motion, useReducedMotion } from "motion/react";
@@ -59,13 +60,22 @@ interface LatticeNodeData {
 
 // order: the step index (into the flat 8-step timeline) at which this node
 // lights up. edges reference the step index at which THEY are the current
-// (animated) transition.
-const NODE_SPEC: Record<NodeId, { trust: TrustState; note?: string; small?: boolean; x: number; y: number; order: number }> = {
-  unverified: { trust: "unverified", note: "everything an LLM writes lands here", x: 0, y: 40, order: 0 },
-  corroborated: { trust: "corroborated", x: 300, y: 40, order: 2 },
-  trusted: { trust: "trusted", note: "returned by recall", x: 600, y: 40, order: 4 },
-  contested: { trust: "contested", note: "a comparable claim disagrees", x: 150, y: 220, small: true, order: 5 },
-  quarantined: { trust: "quarantined", note: "withdrawn from recall", x: 450, y: 220, small: true, order: 7 },
+// (animated) transition. width/height are real pixel estimates of the
+// rendered badge+caption, not filler — react-flow's `fitView` computes its
+// fit from a ResizeObserver pass that lands one frame after mount, which on
+// a first paint with no known node size fits an empty 0×0 box and then
+// never re-fits. Giving every node an explicit size lets it compute the
+// correct fit synchronously, on the first frame, instead of adrift in a
+// stale near-empty viewport.
+const NODE_SPEC: Record<
+  NodeId,
+  { trust: TrustState; note?: string; small?: boolean; x: number; y: number; width: number; height: number; order: number }
+> = {
+  unverified: { trust: "unverified", note: "everything an LLM writes lands here", x: 0, y: 60, width: 150, height: 68, order: 0 },
+  corroborated: { trust: "corroborated", x: 340, y: 60, width: 140, height: 34, order: 2 },
+  trusted: { trust: "trusted", note: "returned by recall", x: 680, y: 60, width: 130, height: 54, order: 4 },
+  contested: { trust: "contested", note: "a comparable claim disagrees", x: 170, y: 260, small: true, width: 145, height: 62, order: 5 },
+  quarantined: { trust: "quarantined", note: "withdrawn from recall", x: 510, y: 260, small: true, width: 145, height: 62, order: 7 },
 };
 
 const EDGE_SPEC: Array<{ id: string; source: NodeId; target: NodeId; label: string; order: number }> = [
@@ -158,6 +168,8 @@ export function TrustLatticeDiagram() {
         id,
         type: "lattice",
         position: { x: spec.x, y: spec.y },
+        width: spec.width,
+        height: spec.height,
         draggable: false,
         selectable: false,
         connectable: false,
@@ -185,27 +197,43 @@ export function TrustLatticeDiagram() {
           animated: !reduced && state === "current",
           selectable: false,
           focusable: false,
-          markerEnd: state === "dim" ? undefined : { type: MarkerType.ArrowClosed, color: colour, width: 14, height: 14 },
+          markerEnd: state === "dim" ? undefined : { type: MarkerType.ArrowClosed, color: colour, width: 16, height: 16 },
           label: spec.label,
-          labelStyle: { fill: state === "dim" ? "var(--moonstone)" : "var(--moonstone)", fontSize: 11, opacity: state === "dim" ? 0.5 : 1 },
-          labelBgStyle: { fill: "var(--abyss)", fillOpacity: 0.85 },
-          labelBgPadding: [4, 2] as [number, number],
-          labelBgBorderRadius: 3,
-          style: { stroke: colour, strokeWidth: 1.5, opacity: state === "dim" ? 0.4 : 1 },
+          labelStyle: { fill: "var(--moonstone)", fontSize: 12, fontFamily: "var(--font-albert)", opacity: state === "dim" ? 0.5 : 1 },
+          labelBgStyle: { fill: "var(--veil)", fillOpacity: 1, stroke: "var(--hairline)", strokeWidth: 1 },
+          labelBgPadding: [6, 4] as [number, number],
+          labelBgBorderRadius: 4,
+          style: { stroke: colour, strokeWidth: 1.75, opacity: state === "dim" ? 0.4 : 1 },
         } satisfies Edge;
       }),
     [stepIndex, reduced],
   );
 
+  // Every node carries an explicit width/height (above), so this is a
+  // deterministic re-affirmation rather than a guess: fitView on mount can
+  // still land a frame before Next's hydration settles the container's own
+  // measured size, so onInit calls it again once react-flow's internal
+  // store is actually ready.
+  const onInit = React.useCallback((instance: ReactFlowInstance<Node<LatticeNodeData>, Edge>) => {
+    instance.fitView({ padding: 0.2 });
+  }, []);
+
   return (
     <div className="flex flex-col gap-3">
-      <div className="h-[300px] w-full md:h-[280px]" aria-hidden={false} role="img" aria-label="The trust lattice: how a claim moves from unverified to corroborated to trusted, or from contested to quarantined">
+      <div
+        className="h-[230px] w-full md:h-[260px]"
+        role="img"
+        aria-label="The trust lattice: how a claim moves from unverified to corroborated to trusted, or from contested to quarantined"
+      >
         <ReactFlow
           nodes={nodes}
           edges={edges}
           nodeTypes={NODE_TYPES}
           fitView
-          fitViewOptions={{ padding: 0.15 }}
+          fitViewOptions={{ padding: 0.2 }}
+          onInit={onInit}
+          minZoom={0.4}
+          maxZoom={1.25}
           panOnDrag={false}
           panOnScroll={false}
           zoomOnScroll={false}
