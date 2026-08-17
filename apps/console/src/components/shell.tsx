@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { TraceFooter } from "@/components/trace-footer";
 import { TenantSwitcher } from "@/components/tenant-switcher";
-import { NavLink } from "@/components/nav-link";
+import { NavRail } from "@/components/nav-rail";
 import { Logo } from "@/components/ui/logo";
 import { activeTenant, tenantsWithKeys } from "@/lib/api/tenants";
 
@@ -66,17 +66,25 @@ export async function Shell({ children }: { children: React.ReactNode }) {
 
           <TenantSwitcher tenants={[...tenants]} active={active} />
 
-          {NAV.map(({ href, label, icon: Icon }) => (
-            <NavLink key={href} href={href} label={label} icon={<Icon className="size-4" aria-hidden />} />
-          ))}
+          <NavRail
+            items={NAV.map(({ href, label, icon: Icon }) => ({
+              href,
+              label,
+              icon: <Icon className="size-4" aria-hidden />,
+            }))}
+          />
 
           <div className="my-3 border-t border-hairline" />
           <p className="px-2 pb-1 text-xs font-medium tracking-wide text-moonstone uppercase">
             Irreversible
           </p>
-          {DESTRUCTIVE_NAV.map(({ href, label, icon: Icon }) => (
-            <NavLink key={href} href={href} label={label} icon={<Icon className="size-4" aria-hidden />} />
-          ))}
+          <NavRail
+            items={DESTRUCTIVE_NAV.map(({ href, label, icon: Icon }) => ({
+              href,
+              label,
+              icon: <Icon className="size-4" aria-hidden />,
+            }))}
+          />
         </nav>
 
         <main className="min-w-0 flex-1 px-5 py-6 md:px-8">{children}</main>
