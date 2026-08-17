@@ -173,8 +173,11 @@ export function ForgetFlow({
                       />
                       <span className="font-display text-sm text-parchment">{info.title}</span>
                       {info.reversible ? (
-                        <span className="rounded-sm border border-synapse-edge px-1.5 text-xs text-synapse">
-                          reversible
+                        <span
+                          className="rounded-sm border border-synapse-edge px-1.5 text-xs text-synapse"
+                          title="Nothing is destroyed — only withdrawn from recall. No un-quarantine control exists in this console yet, so reversing it today means direct database access."
+                        >
+                          data preserved
                         </span>
                       ) : null}
                       {key === "shred" ? (

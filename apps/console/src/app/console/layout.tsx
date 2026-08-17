@@ -1,4 +1,5 @@
 import { Shell } from "@/components/shell";
+import { LiveRefresh } from "@/components/live-refresh";
 
 /**
  * Everything under /console is the operating dashboard — the nine screens
@@ -7,5 +8,10 @@ import { Shell } from "@/components/shell";
  * (`(marketing)/`) can render its own header instead of the dashboard chrome.
  */
 export default function ConsoleLayout({ children }: { children: React.ReactNode }) {
-  return <Shell>{children}</Shell>;
+  return (
+    <>
+      <LiveRefresh />
+      <Shell>{children}</Shell>
+    </>
+  );
 }

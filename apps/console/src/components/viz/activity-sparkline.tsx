@@ -38,13 +38,32 @@ export function ActivitySparkline({
   const reduced = useReducedMotion();
   const [hoverIndex, setHoverIndex] = React.useState<number | null>(null);
   const svgRef = React.useRef<SVGSVGElement>(null);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  // Measured, not assumed: the SVG renders at `width="100%"` (fills its
+  // card) with a FIXED viewBox width. Those two widths agreeing only by
+  // coincidence is exactly what made every circular marker render as a
+  // visible ellipse in a ~640px card — preserveAspectRatio="none" stretched
+  // a 480-unit viewBox to fit a wider box non-uniformly. Measuring the real
+  // rendered width and using it as the viewBox width makes the two the same
+  // number, so there is no non-uniform scale left to distort a circle into.
+  const [width, setWidth] = React.useState(480);
 
   const plotted = React.useMemo<PlottedBucket[]>(
     () => buckets.map((b) => ({ at: new Date(b.at), count: b.count })),
     [buckets],
   );
 
-  const width = 480;
+  React.useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width;
+      if (w && w > 0) setWidth(w);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const margin = { top: 8, right: 4, bottom: 18, left: 4 };
   const innerW = width - margin.left - margin.right;
   const innerH = height - margin.top - margin.bottom;
@@ -118,7 +137,7 @@ export function ActivitySparkline({
   const last = plotted[plotted.length - 1];
 
   return (
-    <div className={cn("relative", className)}>
+    <div ref={containerRef} className={cn("relative", className)}>
       <svg
         ref={svgRef}
         viewBox={`0 0 ${width} ${height}`}
@@ -126,7 +145,6 @@ export function ActivitySparkline({
         height={height}
         role="img"
         aria-label={`Ledger commits over time, ${plotted.length} buckets, peak ${formatCount(maxCount)}`}
-        preserveAspectRatio="none"
       >
         <g transform={`translate(${margin.left},${margin.top})`}>
           {/* recessive baseline gridline */}
@@ -174,15 +192,40 @@ export function ActivitySparkline({
             </g>
           ) : null}
 
-          {/* hit layer covers the whole plot — crosshair finds X, per interaction.md */}
+          {/* hit layer covers the whole plot — crosshair finds X, per
+              interaction.md. Focusable with arrow-key stepping: the sibling
+              LedgerActivityChart already has a keyboard equivalent for its
+              hover tooltip; this one didn't. */}
           <rect
             x={0}
             y={0}
             width={innerW}
             height={innerH}
             fill="transparent"
+            tabIndex={0}
+            role="slider"
+            aria-label="Scrub through commit history"
+            aria-valuemin={0}
+            aria-valuemax={plotted.length - 1}
+            aria-valuenow={hoverIndex ?? plotted.length - 1}
+            aria-valuetext={
+              hovered
+                ? `${formatCount(hovered.count)} commits, ${hovered.at.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric" })}`
+                : undefined
+            }
             onPointerMove={handlePointerMove}
             onPointerLeave={() => setHoverIndex(null)}
+            onFocus={() => setHoverIndex((i) => i ?? plotted.length - 1)}
+            onBlur={() => setHoverIndex(null)}
+            onKeyDown={(event) => {
+              if (event.key === "ArrowLeft") {
+                event.preventDefault();
+                setHoverIndex((i) => Math.max(0, (i ?? plotted.length - 1) - 1));
+              } else if (event.key === "ArrowRight") {
+                event.preventDefault();
+                setHoverIndex((i) => Math.min(plotted.length - 1, (i ?? 0) + 1));
+              }
+            }}
           />
         </g>
       </svg>

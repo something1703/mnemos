@@ -23,12 +23,15 @@ const ACCENT_VAR: Record<string, string> = {
  * invented for the page.
  *
  * Plays as a sequence rather than fading in all at once — each node lights
- * up in promotion order, holds once the full path is lit, then resets and
- * repeats. A viewer should be able to read the story ("unverified needs two
- * sources to become corroborated, a trusted source promotes it outright, a
- * contradiction can still knock it into contested or quarantined") by
- * watching, not by decoding a static graph. Freezes on the fully-lit state
- * under `prefers-reduced-motion` instead of looping.
+ * up in promotion order, once, and holds on the fully-lit state. A viewer
+ * should be able to read the story ("unverified needs two sources to become
+ * corroborated, a trusted source promotes it outright, a contradiction can
+ * still knock it into contested or quarantined") by watching, not by
+ * decoding a static graph. Does not loop: BRAND.md reserves continuous,
+ * repeating motion for the memory trace alone ("the one place in the system
+ * permitted continuous, celebratory motion — everywhere else motion is a
+ * one-time state transition"), and this used to loop forever. Starts
+ * already fully lit under `prefers-reduced-motion`.
  */
 
 // One flat timeline: the two rows are one continuous story, not two
@@ -47,7 +50,6 @@ const STEPS = [
 
 const HOLD_MS = 650;
 const LONG_HOLD_MS = 1500; // where the story pauses to let a completed path sink in
-const RESET_PAUSE_MS = 1000;
 const LONG_HOLD_AFTER = new Set(["trusted", "quarantined"]);
 
 type ElementState = "dim" | "current" | "lit";
@@ -74,8 +76,12 @@ export function TrustLatticeDiagram() {
         timeoutId = setTimeout(() => advance(0), HOLD_MS);
         return;
       }
-      if (i >= STEPS.length) {
-        timeoutId = setTimeout(() => advance(-1), RESET_PAUSE_MS);
+      if (i >= STEPS.length - 1) {
+        // Plays through once, then holds on the fully-lit state — BRAND.md
+        // reserves continuous, looping motion for the memory trace alone
+        // ("everywhere else motion is a one-time state transition"). This
+        // used to reset and repeat forever, which was the wrong element
+        // carrying the brand's one exception.
         return;
       }
       const delay = LONG_HOLD_AFTER.has(STEPS[i]) ? LONG_HOLD_MS : HOLD_MS;

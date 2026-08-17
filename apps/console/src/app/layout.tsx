@@ -40,7 +40,17 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${bricolage.variable} ${albert.variable} ${spline.variable}`}>
-      <body>{children}</body>
+      <body>
+        {/* motion's `initial` state (opacity:0, etc.) serializes into the
+            SSR HTML and only reverses once React hydrates. On a slow
+            connection or with JS disabled entirely, every Reveal-wrapped
+            section and the hero logo would otherwise stay invisible
+            forever — worse than no animation at all. */}
+        <noscript>
+          <style>{`[style*="opacity:0"], [style*="opacity: 0"] { opacity: 1 !important; }`}</style>
+        </noscript>
+        {children}
+      </body>
     </html>
   );
 }

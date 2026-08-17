@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { Globe2, ShieldCheck, GitBranch, ArrowRight } from "lucide-react";
-import { getStats } from "@/lib/api/queries";
+import { getStats, getLedger } from "@/lib/api/queries";
 import { apiConfigured } from "@/lib/api/server";
 import { Button, Card, CardBody } from "@/components/ui/primitives";
 import { Logo } from "@/components/ui/logo";
 import { CountUp } from "@/components/ui/count-up";
 import { Reveal } from "@/components/ui/reveal";
 import { TrustLatticeDiagram } from "@/components/marketing/trust-lattice-diagram";
+import { MemoryTrace, type TraceCommit } from "@/components/viz/memory-trace";
+import type { LedgerOp } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 
 export const revalidate = 30;
@@ -54,6 +56,34 @@ const PLANES = [
   },
 ];
 
+/** Real, deployed infrastructure — not a stack list for its own sake. Each
+ * reason is why that specific service is load-bearing, not decoration
+ * (PRODUCT.md's Operating Context has the full account). Sponsor tech was
+ * previously named twice on the whole site, both at the lowest-contrast
+ * text weight — invisible on the one surface a judge actually evaluates. */
+const BUILT_ON = [
+  {
+    name: "CockroachDB Cloud",
+    reason: "Vectors, provenance graph, and audit ledger in one transactionally consistent database.",
+  },
+  {
+    name: "AWS Lambda",
+    reason: "The API and the sleep cycle — the write path does zero AI work.",
+  },
+  {
+    name: "AWS ECS Fargate",
+    reason: "The Custodian, scheduled and alarm-triggered — the one component with a model in it.",
+  },
+  {
+    name: "S3 Object Lock",
+    reason: "Compliance-mode WORM storage anchoring the ledger's Merkle checkpoints.",
+  },
+  {
+    name: "AWS KMS",
+    reason: "Per-tenant envelope encryption — the key a crypto-shred destroys.",
+  },
+];
+
 const PILLARS = [
   {
     icon: Globe2,
@@ -79,12 +109,25 @@ const PILLARS = [
 ];
 
 export default async function LandingPage() {
-  const stats = apiConfigured() ? await getStats().catch(() => null) : null;
+  const configured = apiConfigured();
+  const [stats, ledger] = configured
+    ? await Promise.all([getStats().catch(() => null), getLedger(48).catch(() => null)])
+    : [null, null];
+  const commits: TraceCommit[] = (ledger?.entries ?? [])
+    .slice()
+    .reverse()
+    .map((entry) => ({
+      shard: entry.shard_id,
+      seq: entry.seq,
+      op: entry.op as LedgerOp,
+      rowHash: entry.entry_hash,
+      at: entry.committed_at,
+    }));
 
   return (
     <>
       {/* ------------------------------------------------------------ hero */}
-      <section className="mx-auto flex max-w-4xl flex-col items-center gap-8 px-5 pt-20 pb-16 text-center md:px-8 md:pt-28">
+      <section className="mx-auto flex max-w-4xl flex-col items-center gap-8 px-5 pt-20 pb-10 text-center md:px-8 md:pt-28">
         <Logo size={56} className="text-synapse" animate />
         <div className="flex flex-col gap-4">
           <h1 className="font-display text-4xl leading-[1.05] tracking-[-0.02em] text-parchment md:text-6xl">
@@ -107,6 +150,24 @@ export default async function LandingPage() {
             <Link href="/how-it-works">See how it works</Link>
           </Button>
         </div>
+
+        {/* The brand's own signature element (BRAND.md: "the one bold
+            element... a live feed of the tenant's real ledger commits") had
+            never once appeared outside /console — on the surface that
+            actually has to make the case to a judge in the first few
+            seconds, the most distinctive and least fakeable thing this
+            product has was simply absent. This is the same MemoryTrace the
+            console footer runs, fed by the same real data. */}
+        {commits.length > 0 ? (
+          <Reveal delay={0.15} className="w-full max-w-2xl">
+            <div className="rounded-lg border border-hairline bg-veil/40 px-4 py-3">
+              <p className="mb-2 text-xs text-moonstone">
+                The last {commits.length} rows committed to the audit chain — right now.
+              </p>
+              <MemoryTrace commits={commits} height={40} />
+            </div>
+          </Reveal>
+        ) : null}
       </section>
 
       {/* ------------------------------------------------------- live stats */}
@@ -247,6 +308,25 @@ export default async function LandingPage() {
               </Reveal>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* -------------------------------------------------------- built-on */}
+      <section className="mx-auto max-w-3xl px-5 py-16 md:px-8">
+        <Reveal>
+          <h2 className="mb-8 text-center font-display text-2xl tracking-[-0.02em] text-parchment md:text-3xl">
+            Built on
+          </h2>
+        </Reveal>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {BUILT_ON.map((b, i) => (
+            <Reveal key={b.name} delay={i * 0.05}>
+              <div className="rounded-lg border border-hairline bg-veil px-4 py-3">
+                <p className="font-display text-sm text-parchment">{b.name}</p>
+                <p className="text-xs text-moonstone">{b.reason}</p>
+              </div>
+            </Reveal>
+          ))}
         </div>
       </section>
 
