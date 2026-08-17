@@ -79,13 +79,17 @@ async def main() -> int:
                 tools = await session.list_tools()
                 check(len(tools.tools) == 14, "14 tools registered", f"got {len(tools.tools)}")
 
+                # source_trust="agent" — a write key cannot declare "operator"
+                # or "system" (those are trusted-on-arrival and require an
+                # admin credential; see the corroboration gate). This is a
+                # correctly-homed *agent* write, not an operator one.
                 written = await session.call_tool(
                     "remember",
                     {
                         "subject_key": "staff:smoke-test",
                         "content": "Smoke test episode — safe to ignore.",
                         "event_type": "note",
-                        "source_trust": "operator",
+                        "source_trust": "agent",
                     },
                 )
                 check(not written.is_error, "remember accepts a correctly-homed subject")
@@ -97,7 +101,7 @@ async def main() -> int:
                         "subject_key": "patient:eu:smoke-test",
                         "content": "Should never be written from us-east-1.",
                         "event_type": "note",
-                        "source_trust": "operator",
+                        "source_trust": "agent",
                     },
                 )
                 check(
