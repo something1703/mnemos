@@ -55,9 +55,9 @@ export function TenantSwitcher({ tenants, active }: { tenants: Tenant[]; active:
         <DropdownMenu.Content
           align="start"
           sideOffset={4}
-          className="z-50 w-64 rounded border border-hairline bg-ink p-1 shadow-xl"
+          className="z-50 w-64 rounded border border-hairline bg-abyss p-1 shadow-xl"
         >
-          <DropdownMenu.Label className="px-2 py-1.5 text-[10px] font-medium tracking-wide text-dim uppercase">
+          <DropdownMenu.Label className="px-2 py-1.5 text-xs font-medium tracking-wide text-moonstone uppercase">
             Tenant — a separate key, not a filter
           </DropdownMenu.Label>
           {tenants.map((t) => (
@@ -72,7 +72,7 @@ export function TenantSwitcher({ tenants, active }: { tenants: Tenant[]; active:
               />
               <span className="min-w-0">
                 <span className="block text-sm text-parchment">{t.label}</span>
-                <span className="block text-xs text-dim">{t.blurb}</span>
+                <span className="block text-xs text-moonstone">{t.blurb}</span>
               </span>
             </DropdownMenu.Item>
           ))}

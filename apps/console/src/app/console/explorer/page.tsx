@@ -3,6 +3,7 @@ import { recall } from "@/lib/api/mcp";
 import { apiConfigured } from "@/lib/api/server";
 import { Card, CardBody, EmptyState } from "@/components/ui/primitives";
 import { FactCard } from "@/components/fact-card";
+import { TryExampleLink } from "@/components/try-example-link";
 import { SearchForm } from "./search-form";
 
 export const dynamic = "force-dynamic";
@@ -50,10 +51,15 @@ export default async function ExplorerPage({
         <EmptyState title="Ask a question to see what memory answers">
           Recall is hybrid — vector similarity and lexical match, re-ranked by how much the system
           actually believes each fact. Try{" "}
-          <Link href="/console/explorer?q=is+the+database+cluster+healthy%3F" className="text-synapse hover:underline">
+          <TryExampleLink
+            tenantSlug="ops"
+            href="/console/explorer?q=is+the+database+cluster+healthy%3F"
+            className="inline-flex"
+          >
             “is the database cluster healthy?”
-          </Link>{" "}
-          to see the Custodian&rsquo;s own corroborated finding come back.
+          </TryExampleLink>{" "}
+          to see the Custodian&rsquo;s own corroborated finding come back — this example lives on
+          the ops tenant, so it switches you there first.
         </EmptyState>
       )}
     </div>
@@ -118,7 +124,7 @@ async function Results({
         </EmptyState>
       ) : (
         <>
-          <p className="text-xs text-dim">
+          <p className="text-xs text-moonstone">
             {facts.length} fact{facts.length === 1 ? "" : "s"}, ranked by similarity × strength ×
             confidence × trust
             {contested.length > 0 ? ` · ${contested.length} contested and flagged` : ""}

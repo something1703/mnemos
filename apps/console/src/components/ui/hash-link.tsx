@@ -40,7 +40,7 @@ export function HashLink({
       )}
     >
       {middleTruncate(value, head, tail)}
-      <span aria-live="polite" className="text-[10px] text-synapse">
+      <span aria-live="polite" className="text-xs text-synapse">
         {copied ? "copied" : ""}
       </span>
     </button>

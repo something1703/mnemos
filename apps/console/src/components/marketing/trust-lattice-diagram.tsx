@@ -119,7 +119,7 @@ export function TrustLatticeDiagram() {
         />
       </div>
 
-      <p className="mx-auto max-w-md text-center text-xs text-dim">
+      <p className="mx-auto max-w-md text-center text-xs text-moonstone">
         Promotion needs a <em>different session</em> and a <em>different source
         origin</em> — the same repeated claim from one channel never counts twice.
       </p>
@@ -158,8 +158,12 @@ function Node({
       {note ? (
         <span
           className={cn(
-            "max-w-[14ch] text-center text-[11px] transition-colors duration-300",
-            state === "dim" ? "text-dim/50" : "text-dim",
+            "max-w-[14ch] text-center text-xs transition-colors duration-300",
+            // A note that reads as ~1.8:1 contrast for up to 7s per loop is
+            // not "de-emphasized," it is illegible — moonstone/50 still
+            // clears large-text contrast at rest, and lands at full
+            // moonstone once lit.
+            state === "dim" ? "text-moonstone/50" : "text-moonstone",
           )}
         >
           {note}
@@ -199,8 +203,8 @@ function Arrow({
       </motion.div>
       <span
         className={cn(
-          "max-w-[12ch] text-center text-[10px] transition-colors duration-300",
-          state === "dim" ? "text-dim/50" : "text-dim",
+          "max-w-[12ch] text-center text-xs transition-colors duration-300",
+          state === "dim" ? "text-moonstone/50" : "text-moonstone",
         )}
       >
         {label}

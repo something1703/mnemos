@@ -9,6 +9,12 @@ interface Stage {
   detail: string;
   accent: "ember" | "synapse" | "signal" | "umbra" | "parchment";
   llm?: boolean;
+  /** Only `remember()` and `recall()` are real function identifiers; "the
+   * Warden", "the ledger", "sleep cycle", and "semantic facts" are
+   * human-written plane names. The Mono-Is-Semantic rule (DESIGN.md) says
+   * mono marks a machine-authored, verifiable value — applying it to both
+   * kinds uniformly was exactly the violation this flag exists to prevent. */
+  mono?: boolean;
 }
 
 const WRITE_PATH: Stage[] = [
@@ -16,6 +22,7 @@ const WRITE_PATH: Stage[] = [
     title: "remember()",
     detail: "an episode is written, encrypted, homed to a region — zero AI work",
     accent: "ember",
+    mono: true,
   },
   {
     title: "sleep cycle",
@@ -31,7 +38,12 @@ const WRITE_PATH: Stage[] = [
 ];
 
 const READ_PATH: Stage[] = [
-  { title: "recall()", detail: "hybrid search, trust-gated, logged", accent: "synapse" },
+  {
+    title: "recall()",
+    detail: "hybrid search, trust-gated, logged",
+    accent: "synapse",
+    mono: true,
+  },
 ];
 
 const GOVERNANCE: Stage[] = [
@@ -48,12 +60,12 @@ const LEDGER: Stage = {
   accent: "parchment",
 };
 
-const ACCENT_BORDER: Record<Stage["accent"], string> = {
-  ember: "border-l-ember",
-  synapse: "border-l-synapse",
-  signal: "border-l-signal",
-  umbra: "border-l-umbra",
-  parchment: "border-l-hairline",
+const ACCENT_DOT: Record<Stage["accent"], string> = {
+  ember: "bg-ember",
+  synapse: "bg-synapse",
+  signal: "bg-signal",
+  umbra: "bg-umbra",
+  parchment: "bg-moonstone",
 };
 
 const cardVariants: Variants = {
@@ -79,7 +91,7 @@ export function LifecycleDiagram() {
       <Row stages={READ_PATH} />
       <div className="my-2 h-px w-24 bg-hairline" aria-hidden />
       <Row stages={GOVERNANCE} />
-      <p className="mt-2 max-w-md text-center text-xs text-dim">
+      <p className="mt-2 max-w-md text-center text-xs text-moonstone">
         Every box above the line appends to the ledger on every state change — the
         Warden included. Nothing skips it.
       </p>
@@ -105,9 +117,9 @@ export function LifecycleDiagram() {
     return (
       <motion.div
         className={cn(
-          "flex flex-col gap-1 rounded border border-hairline border-l-2 bg-veil px-4 py-3",
-          ACCENT_BORDER[stage.accent],
+          "flex flex-col gap-1 rounded-lg border border-hairline bg-veil px-4 py-3",
           wide ? "w-full max-w-sm text-center" : "w-52",
+          wide && "items-center",
         )}
         initial={reduced ? undefined : "hidden"}
         whileInView={reduced ? undefined : "visible"}
@@ -115,10 +127,13 @@ export function LifecycleDiagram() {
         variants={cardVariants}
         transition={{ duration: 0.4 }}
       >
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-sm text-parchment">{stage.title}</span>
+        <div className={cn("flex items-center gap-2", wide && "justify-center")}>
+          <span className={cn("size-2 shrink-0 rounded-full", ACCENT_DOT[stage.accent])} aria-hidden />
+          <span className={cn("text-sm text-parchment", stage.mono ? "font-mono" : "font-display")}>
+            {stage.title}
+          </span>
           {stage.llm ? (
-            <span className="rounded-sm border border-hairline px-1 py-px text-[9px] tracking-wide text-dim uppercase">
+            <span className="rounded-sm border border-hairline px-1.5 py-px text-xs tracking-wide text-moonstone uppercase">
               model
             </span>
           ) : null}

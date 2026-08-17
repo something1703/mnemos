@@ -13,7 +13,7 @@ import type { LedgerOp } from "@/lib/brand";
 export async function TraceFooter() {
   if (!apiConfigured()) {
     return (
-      <footer className="border-t border-hairline bg-veil/40 px-4 py-2 text-xs text-dim">
+      <footer className="border-t border-hairline bg-veil/40 px-4 py-2 text-xs text-moonstone">
         Memory trace idle — set <span className="font-mono">MNEMOS_API_URL</span> to connect it to
         a live ledger.
       </footer>
@@ -41,7 +41,7 @@ export async function TraceFooter() {
   return (
     <footer className="border-t border-hairline bg-veil/40">
       <div className="flex items-center gap-4 px-4 py-1.5">
-        <span className="shrink-0 text-[10px] font-medium tracking-wide text-dim uppercase">
+        <span className="shrink-0 text-xs font-medium tracking-wide text-dim uppercase">
           Memory trace
         </span>
         <div className="min-w-0 flex-1 overflow-x-auto">

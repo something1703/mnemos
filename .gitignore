@@ -49,3 +49,4 @@ bench/results/*.raw
 .idea/
 .vscode/
 !.vscode/extensions.json
+.impeccable/hook.cache.json

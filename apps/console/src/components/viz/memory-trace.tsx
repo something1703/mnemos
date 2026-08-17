@@ -87,7 +87,7 @@ export function MemoryTrace({
   if (commits.length === 0) {
     return (
       <div
-        className={cn("flex items-center px-4 text-xs text-dim", className)}
+        className={cn("flex items-center px-4 text-xs text-moonstone", className)}
         style={{ height }}
         role="status"
       >

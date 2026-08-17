@@ -114,7 +114,7 @@ export default async function CustodianPage({
       <Card>
         <CardHeader>
           <CardTitle>Governance proposals</CardTitle>
-          <span className="text-xs text-dim">the agent can ask; only a person can answer</span>
+          <span className="text-xs text-moonstone">the agent can ask; only a person can answer</span>
         </CardHeader>
         <CardBody>
           {proposals.length === 0 ? (
@@ -133,7 +133,7 @@ export default async function CustodianPage({
                       {p.kind}
                     </span>
                     <span className="font-mono text-xs text-parchment">{p.target}</span>
-                    <span className="ml-auto text-xs text-dim">{p.status}</span>
+                    <span className="ml-auto text-xs text-moonstone">{p.status}</span>
                   </div>
                   <p className="mt-2 text-sm text-moonstone">{p.rationale}</p>
                 </li>
@@ -192,7 +192,7 @@ function RunRow({ run, selected }: { run: CustodianRun; selected?: string }) {
   const coverage = run.checks_run + run.checks_skipped;
   return (
     <Link
-      href={`/custodian?run=${run.run_id}`}
+      href={`/console/custodian?run=${run.run_id}`}
       className={`flex flex-col gap-1 rounded border px-3 py-2 transition-colors ${
         isSelected
           ? "border-synapse-edge bg-synapse-fill"
@@ -205,9 +205,9 @@ function RunRow({ run, selected }: { run: CustodianRun; selected?: string }) {
         <span className="ml-auto text-xs text-dim">{relativeTime(run.started_at)}</span>
       </span>
       {run.trigger_detail ? (
-        <span className="truncate font-mono text-[11px] text-ember">{run.trigger_detail}</span>
+        <span className="truncate font-mono text-xs text-ember">{run.trigger_detail}</span>
       ) : null}
-      <span className="text-xs text-dim">
+      <span className="text-xs text-moonstone">
         {run.checks_run}/{coverage} checks ·{" "}
         <span className={run.status === "succeeded" ? "text-synapse" : "text-ember"}>
           {run.status}
@@ -243,24 +243,26 @@ function FindingRow({ finding }: { finding: CustodianFinding }) {
           )}
           {finding.measured ? "measured" : "interpreted"}
         </span>
-        <span className="rounded-sm border border-hairline bg-veil px-2 py-0.5 font-mono text-xs text-moonstone">
-          {finding.skill_id}
-        </span>
-        <span className="rounded-sm border border-hairline bg-veil px-2 py-0.5 font-mono text-xs text-dim">
-          via {finding.tool_source}
-        </span>
-        <span className="ml-auto text-xs text-dim">{relativeTime(finding.created_at)}</span>
+        <span className="ml-auto text-xs text-moonstone">{relativeTime(finding.created_at)}</span>
       </div>
 
-      <p className="mt-2 text-sm text-parchment">{finding.summary}</p>
+      {/* The sentence a human reads is the point of this row; provenance
+          metadata (which skill, which tool, the finding code) is real and
+          worth keeping, but it is chrome around that sentence, not a peer of
+          it — demoted below rather than competing above. */}
+      <p className="mt-2 text-base text-parchment">{finding.summary}</p>
       {finding.recommendation ? (
         <p className="mt-1 text-sm text-moonstone">
-          <span className="text-dim">Recommends: </span>
+          <span className="text-moonstone/70">Recommends: </span>
           {finding.recommendation}
         </p>
       ) : null}
 
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-dim">
+        <span className="rounded-sm border border-hairline bg-veil px-1.5 py-px font-mono">
+          {finding.skill_id}
+        </span>
+        <span>via {finding.tool_source}</span>
         <span className="font-mono">{finding.code}</span>
         {finding.fact_id ? (
           <>

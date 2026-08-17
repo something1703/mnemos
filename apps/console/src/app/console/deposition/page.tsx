@@ -3,8 +3,16 @@ import { Card, CardBody, CardHeader, CardTitle, EmptyState } from "@/components/
 import { HashLink } from "@/components/ui/hash-link";
 import { TrustBadge } from "@/components/ui/trust-badge";
 import { ActionForm } from "./action-form";
+import { TryExampleLink } from "@/components/try-example-link";
 import { relativeTime } from "@/lib/utils";
 import { OP_PRESENTATION, ACCENT_CLASSES, type LedgerOp, type TrustState } from "@/lib/brand";
+
+/** A real, live action_id on the ops tenant (queried directly against the
+ * deployed cluster, 2026-08-17) — not seeded fixture data invented for this
+ * link. The Deposition and Blast Radius pillars both had no way to discover
+ * a valid id on their own; this is the fix, matching the worked example
+ * Explorer already had (`?q=is+the+database+cluster+healthy%3F`). */
+const EXAMPLE_ACTION_ID = "224c51a4-35b5-48b7-9be7-2496780199c4";
 
 export const dynamic = "force-dynamic";
 
@@ -80,7 +88,14 @@ export default async function DepositionPage({
       ) : action ? (
         <Body actionId={action} />
       ) : (
-        <EmptyState title="Enter an action id">
+        <EmptyState
+          title="Enter an action id"
+          action={
+            <TryExampleLink tenantSlug="ops" href={`/console/deposition?action=${EXAMPLE_ACTION_ID}`}>
+              Try a real one — an ops escalation, deposed live
+            </TryExampleLink>
+          }
+        >
           Every <span className="font-mono">record_action</span> call an agent makes can be
           deposed. Paste its id above to reconstruct the chain that produced it.
         </EmptyState>
@@ -162,7 +177,7 @@ async function Body({ actionId }: { actionId: string }) {
       <Card>
         <CardHeader>
           <CardTitle>Facts it relied on</CardTitle>
-          <span className="text-xs text-dim">then → now</span>
+          <span className="text-xs text-moonstone">then → now</span>
         </CardHeader>
         <CardBody>
           {deposition.facts.length === 0 ? (
@@ -189,12 +204,12 @@ async function Body({ actionId }: { actionId: string }) {
                         superseded since
                       </span>
                     ) : null}
-                    <span className="ml-auto font-mono text-xs text-dim">
+                    <span className="ml-auto font-mono text-xs text-moonstone">
                       score {fact.score_at_recall?.toFixed?.(3) ?? "—"}
                     </span>
                   </div>
                   <p className="mt-2 font-mono text-xs text-parchment">{fact.subject_key}</p>
-                  <p className="mt-1 text-xs text-dim">
+                  <p className="mt-1 text-xs text-moonstone">
                     {fact.provenance.length} provenance edge
                     {fact.provenance.length === 1 ? "" : "s"} back to raw episodes
                   </p>
@@ -227,10 +242,10 @@ async function Body({ actionId }: { actionId: string }) {
                   >
                     {presentation.label}
                   </span>
-                  <span className="tabular w-16 shrink-0 font-mono text-dim">
+                  <span className="tabular w-16 shrink-0 font-mono text-moonstone">
                     {entry.shard_id}/{entry.seq}
                   </span>
-                  <span className="flex-1 truncate font-mono text-dim">{entry.actor}</span>
+                  <span className="flex-1 truncate font-mono text-moonstone">{entry.actor}</span>
                   <HashLink value={entry.entry_hash} head={6} tail={4} />
                 </li>
               );

@@ -23,7 +23,7 @@ export function FactCard({ fact }: { fact: RecalledFact }) {
             {fact.fact_kind}
           </span>
           <RegionChip region={fact.home_region} />
-          <span className="ml-auto text-xs text-dim">
+          <span className="ml-auto text-xs text-moonstone">
             score <span className="tabular font-mono text-parchment">{fact.score.toFixed(3)}</span>
           </span>
         </div>
@@ -36,14 +36,14 @@ export function FactCard({ fact }: { fact: RecalledFact }) {
              * lost master key looks identical from here. Asserting the cause
              * would be the console inventing evidence, which is the one thing
              * an accountability product must never do. */
-            <span className="text-dim italic">
+            <span className="text-moonstone italic">
               Content could not be decrypted with this deployment&rsquo;s key. The fact and its
               provenance remain on the record; only the plaintext is unreadable.
             </span>
           )}
         </p>
 
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-dim">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-moonstone">
           <span className="font-mono">{fact.subject_key}</span>
           <span>·</span>
           <span>
@@ -70,7 +70,7 @@ function Factor({ label, value, max = 1 }: { label: string; value: number; max?:
   const pct = Math.max(0, Math.min(100, (value / max) * 100));
   return (
     <div className="flex flex-col gap-1">
-      <dt className="text-[10px] tracking-wide text-dim uppercase">{label}</dt>
+      <dt className="text-xs tracking-wide text-moonstone uppercase">{label}</dt>
       <dd className="tabular font-mono text-xs text-moonstone">{value.toFixed(2)}</dd>
       <div className="h-1 overflow-hidden rounded-full bg-veil-hi" aria-hidden>
         <div className="h-full rounded-full bg-synapse/70" style={{ width: `${pct}%` }} />

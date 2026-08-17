@@ -2,6 +2,7 @@ import "server-only";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { TrustState } from "@/lib/brand";
+import { activeTenantKey } from "@/lib/api/tenants";
 
 /**
  * The MCP half of the BFF.
@@ -18,6 +19,7 @@ import type { TrustState } from "@/lib/brand";
  */
 
 const BASE = (process.env.MNEMOS_API_URL ?? "").replace(/\/$/, "");
+/** Single-tenant fallback, for a deployment that sets only one read key. */
 const READ_KEY = process.env.MNEMOS_API_KEY_READ ?? "";
 
 export interface RecalledFact {
@@ -65,14 +67,22 @@ export interface RecallResult {
 export async function callTool<T = unknown>(
   name: string,
   args: Record<string, unknown>,
-  { key = READ_KEY }: { key?: string } = {},
+  { key }: { key?: string } = {},
 ): Promise<T> {
   if (!BASE) throw new Error("MNEMOS_API_URL is not set");
-  if (!key) throw new Error("No API key available for this call");
+  // Resolved per call from the tenant cookie, same as apiGet (server.ts) —
+  // found missing during the design pass: every MCP-routed screen (recall,
+  // recall_as_of, where_is, blast_radius) was silently ignoring the tenant
+  // switcher and always querying whichever tenant MNEMOS_API_KEY_READ
+  // happens to belong to, while the REST-routed screens correctly switched.
+  // An explicit `key` (the admin-gated calls in api/admin/route.ts) still
+  // wins over both.
+  const resolved = key || (await activeTenantKey()) || READ_KEY;
+  if (!resolved) throw new Error("No API key available for this call");
 
   const client = new Client({ name: "mnemos-console", version: "0.1.0" });
   const transport = new StreamableHTTPClientTransport(new URL(`${BASE}/mcp`), {
-    requestInit: { headers: { Authorization: `Bearer ${key}` } },
+    requestInit: { headers: { Authorization: `Bearer ${resolved}` } },
   });
 
   try {

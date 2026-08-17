@@ -20,11 +20,11 @@ const ICON_ACCENT_CLASS = {
   signal: "text-signal",
 } as const;
 
-const BORDER_ACCENT_CLASS = {
-  ember: "border-l-ember",
-  parchment: "border-l-hairline",
-  signal: "border-l-signal",
-  umbra: "border-l-umbra",
+const DOT_ACCENT_CLASS = {
+  ember: "bg-ember",
+  parchment: "bg-moonstone",
+  signal: "bg-signal",
+  umbra: "bg-umbra",
 } as const;
 
 const PLANES = [
@@ -122,7 +122,7 @@ export default async function LandingPage() {
               <LiveStat label="Ledger entries" value={stats.chain_entries} />
               <LiveStat label="Chain shards" value={stats.posture.chain_shards} />
             </div>
-            <p className="pb-6 text-center text-xs text-dim">
+            <p className="pb-6 text-center text-xs text-moonstone">
               Live from the deployed instance — not a mockup.
             </p>
           </section>
@@ -227,15 +227,22 @@ export default async function LandingPage() {
           <div className="grid gap-3 md:grid-cols-2">
             {PLANES.map((p, i) => (
               <Reveal key={p.name} delay={i * 0.06}>
-                <div
-                  className={cn(
-                    "flex flex-col gap-1 rounded border border-hairline border-l-2 bg-veil px-4 py-3",
-                    BORDER_ACCENT_CLASS[p.accent],
-                  )}
-                >
-                  <span className="font-display text-sm text-parchment">{p.name}</span>
+                <div className="flex flex-col gap-1.5 rounded-lg border border-hairline bg-veil px-4 py-3.5">
+                  <span className="flex items-center gap-2">
+                    {/* The same dot-per-operation language the memory trace
+                        uses, not a left-border tab — the console already has
+                        a way to say "this accent, this operation" and it
+                        isn't a colored stripe. */}
+                    <span
+                      className={cn("size-2 shrink-0 rounded-full", DOT_ACCENT_CLASS[p.accent])}
+                      aria-hidden
+                    />
+                    <span className="font-display text-sm text-parchment">{p.name}</span>
+                  </span>
                   <span className="text-xs text-moonstone">{p.role}</span>
-                  <span className="text-[11px] text-dim">Contains an LLM: {p.llm}</span>
+                  <span className="text-xs font-medium text-moonstone">
+                    Contains an LLM: <span className="text-parchment">{p.llm}</span>
+                  </span>
                 </div>
               </Reveal>
             ))}
@@ -274,7 +281,7 @@ function LiveStat({ label, value }: { label: string; value: number }) {
       <span className="font-display text-2xl tabular text-synapse md:text-3xl">
         <CountUp value={value} />
       </span>
-      <span className="text-xs text-dim">{label}</span>
+      <span className="text-xs text-moonstone">{label}</span>
     </div>
   );
 }

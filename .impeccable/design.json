@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-17T00:00:00Z",
+  "title": "Design System: Mnemos",
+  "extensions": {
+    "colorMeta": {
+      "synapse": { "role": "primary", "displayName": "Synapse — bioluminescent teal", "canonical": "#6FE3D2", "tonalRamp": ["#0d3530", "#134a42", "#1c6459", "#2d8477", "#48a798", "#6fe3d2", "#9becdf", "#ccf5ec"] },
+      "ember": { "role": "secondary", "displayName": "Ember — warm amber", "canonical": "#F2A65A", "tonalRamp": ["#3d2610", "#54330f", "#7a4813", "#a2611c", "#c98130", "#f2a65a", "#f7c48f", "#fce1c4"] },
+      "signal": { "role": "tertiary", "displayName": "Signal — desaturated red", "canonical": "#E4586B", "tonalRamp": ["#3a1015", "#4f151c", "#711d27", "#992838", "#c13a4c", "#e4586b", "#ee8b98", "#f7c1c8"] },
+      "umbra": { "role": "tertiary", "displayName": "Umbra — muted violet", "canonical": "#8B7FD4", "tonalRamp": ["#211c3d", "#2c2653", "#3f3777", "#584ba0", "#7266bd", "#8b7fd4", "#b0a7e3", "#d6d0f1"] },
+      "abyss": { "role": "neutral", "displayName": "Abyss — app background", "canonical": "#12172B", "tonalRamp": ["#080a12", "#0d101c", "#12172b", "#1a2038", "#232b45", "#2d3752", "#36415f", "#a8b3cf"] },
+      "veil": { "role": "neutral", "displayName": "Veil — raised surface", "canonical": "#232B45", "tonalRamp": ["#12172b", "#1a2038", "#232b45", "#2d3752", "#36415f", "#4a567a", "#7885a8", "#a8b3cf"] },
+      "veil-hi": { "role": "neutral", "displayName": "Veil-hi — hover/active surface", "canonical": "#2D3752", "tonalRamp": ["#1a2038", "#232b45", "#2d3752", "#36415f", "#4a567a", "#5f6d94", "#8d99bc", "#c5cde0"] },
+      "hairline": { "role": "neutral", "displayName": "Hairline — border/divider", "canonical": "#36415F", "tonalRamp": ["#1e2438", "#2a324a", "#36415f", "#495578", "#606f96", "#7c8bb3", "#a8b3cf", "#d5dae8"] },
+      "parchment": { "role": "neutral", "displayName": "Parchment — primary text", "canonical": "#EDEFF7", "tonalRamp": ["#6f7b9b", "#8895b5", "#a8b3cf", "#c2cadf", "#d7dceb", "#e6e9f3", "#edeff7", "#f7f8fb"] },
+      "moonstone": { "role": "neutral", "displayName": "Moonstone — secondary text", "canonical": "#A8B3CF", "tonalRamp": ["#4a5674", "#5e6b8c", "#7683a3", "#8f9bb9", "#a8b3cf", "#c2cadf", "#d7dceb", "#edeff7"] },
+      "dim": { "role": "neutral", "displayName": "Dim — tertiary text / disabled", "canonical": "#6F7B9B", "tonalRamp": ["#333a4d", "#454e68", "#576184", "#63709a", "#6f7b9b", "#8895b5", "#a8b3cf", "#c9cfe1"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Page titles, hero numbers, section headers. Bricolage Grotesque only." },
+      "body": { "displayName": "Body", "purpose": "All prose, labels, descriptions. Albert Sans." },
+      "label": { "displayName": "Label / Mono", "purpose": "Machine-authored or verifiable values — hashes, ledger seq numbers, region codes. Spline Sans Mono." }
+    },
+    "shadows": [
+      { "name": "overlay", "value": "shadow-lg / shadow-xl (Tailwind default ramp)", "purpose": "Floating content only — tooltips, dropdown menus. Never a card at rest." },
+      { "name": "focus-ring", "value": "0 0 0 2px var(--abyss), 0 0 0 4px var(--synapse)", "purpose": "Global :focus-visible state on every interactive element." }
+    ],
+    "motion": [
+      { "name": "dur-fast", "value": "120ms", "purpose": "Hover/active color and background transitions." },
+      { "name": "dur", "value": "220ms", "purpose": "Default transition duration for state changes." },
+      { "name": "ease-brand", "value": "cubic-bezier(0.2, 0.7, 0.3, 1)", "purpose": "The system's one easing curve — used by every motion-authored animation (memory trace, count-up, trust lattice, logo draw-in)." }
+    ],
+    "breakpoints": [
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single most important action on a screen.",
+      "html": "<button class=\"ds-btn-primary\">Open the console</button>",
+      "css": ".ds-btn-primary { background: rgb(111 227 210 / 12%); color: #6FE3D2; border: 1px solid rgb(111 227 210 / 38%); border-radius: 8px; height: 2.25rem; padding: 0 0.875rem; font-size: 0.875rem; font-weight: 500; font-family: 'Albert Sans', sans-serif; transition: background 0.12s cubic-bezier(0.2,0.7,0.3,1); } .ds-btn-primary:hover { background: rgb(111 227 210 / 20%); }"
+    },
+    {
+      "name": "Destroy Button",
+      "kind": "button",
+      "refersTo": "button-destroy",
+      "description": "The only solid-fill button in the system. One per destructive flow, never more.",
+      "html": "<button class=\"ds-btn-destroy\">Forget subject</button>",
+      "css": ".ds-btn-destroy { background: #E4586B; color: #12172B; border: none; border-radius: 8px; height: 2.25rem; padding: 0 0.875rem; font-weight: 600; font-family: 'Albert Sans', sans-serif; transition: background 0.12s; } .ds-btn-destroy:hover { background: rgb(228 88 107 / 90%); }"
+    },
+    {
+      "name": "Trust Badge — Trusted",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "One of five trust states; color AND shape both carry meaning (filled circle = trusted).",
+      "html": "<span class=\"ds-badge-trusted\"><svg width=\"10\" height=\"10\" viewBox=\"0 0 10 10\"><circle cx=\"5\" cy=\"5\" r=\"3.5\" fill=\"currentColor\"/></svg>Trusted</span>",
+      "css": ".ds-badge-trusted { display: inline-flex; align-items: center; gap: 6px; border-radius: 4px; padding: 2px 8px; font-size: 0.75rem; font-weight: 500; color: #6FE3D2; background: rgb(111 227 210 / 12%); border: 1px solid rgb(111 227 210 / 38%); }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The base container. Flat at rest — no shadow; depth is the veil layer plus a hairline border.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-header\">Trust distribution</div><div class=\"ds-card-body\">…</div></div>",
+      "css": ".ds-card { background: #232B45; border: 1px solid #36415F; border-radius: 14px; } .ds-card-header { padding: 14px 20px; border-bottom: 1px solid #36415F; font-family: 'Bricolage Grotesque', sans-serif; font-size: 1rem; } .ds-card-body { padding: 16px 20px; }"
+    },
+    {
+      "name": "Memory Trace",
+      "kind": "custom",
+      "refersTo": "memory-trace",
+      "description": "Signature component: a live SVG hash-chain of ledger commits, tinted by operation class, dashed at an erasure, heavier anchor node at a checkpoint. Draws in on mount; new commits pop with an expanding-ring highlight.",
+      "html": "<svg class=\"ds-trace\" viewBox=\"0 0 240 44\"><line x1=\"16\" y1=\"22\" x2=\"42\" y2=\"22\" stroke=\"#36415F\"/><circle cx=\"16\" cy=\"22\" r=\"3.5\" fill=\"#6FE3D2\"/><circle cx=\"42\" cy=\"22\" r=\"3.5\" fill=\"#F2A65A\"/></svg>",
+      "css": ".ds-trace { display: block; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Engram at Night",
+    "overview": "Long-exposure neuron microscopy: deep indigo depths with bioluminescent traces moving through them. Surfaces are layered translucency rather than flat black, implying tiers beneath the one you're looking at. Color is a four-way semantic system, not a single decorative accent — a viewer should be able to read system state from a screenshot alone. The system is quiet everywhere except one place: the memory trace is the one bold, animated signature element.",
+    "keyCharacteristics": [
+      "Deep indigo surfaces in three translucent layers (abyss → veil → veil-hi), never flat black",
+      "Four accent colors, each meaning exactly one system operation, never used decoratively",
+      "Flat by default — depth comes from tonal layering and hairline borders, not shadows",
+      "Signal red appears as a filled button background in exactly one place per destructive flow",
+      "Motion is restrained and purposeful, fully suppressed under prefers-reduced-motion"
+    ],
+    "rules": [
+      { "name": "The One Meaning Rule", "body": "A color is never chosen for how it looks on a given screen. If a new element needs a color, it needs a clearer statement of what system operation it represents first.", "section": "colors" },
+      { "name": "The Signal Scarcity Rule", "body": "Signal red is a filled button background in exactly one place per flow — the destructive-confirm control. Everywhere else it is text, a badge outline, or a status dot.", "section": "colors" },
+      { "name": "The Mono-Is-Semantic Rule", "body": "Monospace marks a value a machine wrote and the system can verify. If a human wrote it, it is never set in mono.", "section": "typography" },
+      { "name": "The Overlay-Only Shadow Rule", "body": "A card at rest never carries a shadow. Shadow is reserved for content that must read as floating above the page.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use the four accents only for their assigned meaning — reading, writing, destroying, doubting.",
+      "Do pair every color-coded state with a text label and, for trust states, a distinct shape.",
+      "Do set machine-authored/verifiable values in Spline Sans Mono; everything a human wrote in Albert Sans.",
+      "Do respect prefers-reduced-motion on every animation without exception.",
+      "Do use active-voice, verb-led button labels."
+    ],
+    "donts": [
+      "Don't give a card, section, or badge a shadow at rest.",
+      "Don't introduce a fifth accent color or a new hue for any reason.",
+      "Don't use signal red as a filled button background anywhere except the one destructive-confirm control per flow.",
+      "Don't soften destructive UI copy."
+    ]
+  }
+}

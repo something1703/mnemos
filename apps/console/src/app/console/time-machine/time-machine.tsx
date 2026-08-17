@@ -91,7 +91,7 @@ export function TimeMachine({
       <Card>
         <CardHeader>
           <CardTitle>Temporal window</CardTitle>
-          <span className="font-mono text-xs text-dim">
+          <span className="font-mono text-xs text-moonstone">
             gc.ttlseconds = {gcSeconds.toLocaleString()}
           </span>
         </CardHeader>
@@ -118,7 +118,7 @@ export function TimeMachine({
               aria-valuetext={offset === 0 ? "now" : `${formatOffset(offset)} ago`}
               className="w-full accent-[var(--synapse)]"
             />
-            <div className="flex justify-between text-xs text-dim">
+            <div className="flex justify-between text-xs text-moonstone">
               <span>{formatOffset(gcSeconds)} ago — the GC boundary</span>
               <span>now</span>
             </div>
@@ -172,7 +172,7 @@ export function TimeMachine({
         </EmptyState>
       ) : (
         <div className="flex flex-col gap-3">
-          <p className="text-xs text-dim">
+          <p className="text-xs text-moonstone">
             Comparing <span className="text-parchment">{formatOffset(offset)} ago</span> against now
           </p>
           {diff.length === 0 ? (
@@ -243,7 +243,7 @@ const KIND_COPY: Record<DiffKind, { label: string; className: string }> = {
     label: "No longer returned",
     className: "border-signal-edge bg-signal-fill text-signal",
   },
-  unchanged: { label: "Unchanged", className: "border-hairline bg-veil-hi text-dim" },
+  unchanged: { label: "Unchanged", className: "border-hairline bg-veil-hi text-moonstone" },
 };
 
 function DiffRow({ row }: { row: DiffRow }) {
@@ -263,10 +263,10 @@ function DiffRow({ row }: { row: DiffRow }) {
         ) : (
           <TrustBadge trust={row.fact.trust} />
         )}
-        <span className="ml-auto font-mono text-xs text-dim">{row.fact.subject_key}</span>
+        <span className="ml-auto font-mono text-xs text-moonstone">{row.fact.subject_key}</span>
       </div>
       <p className="mt-2 text-sm text-parchment">
-        {row.fact.text ?? <span className="text-dim italic">content not decryptable</span>}
+        {row.fact.text ?? <span className="text-moonstone italic">content not decryptable</span>}
       </p>
     </article>
   );

@@ -92,7 +92,7 @@ export default async function LedgerPage() {
       <Card>
         <CardHeader>
           <CardTitle>The chain, by shard</CardTitle>
-          <span className="text-xs text-dim">
+          <span className="text-xs text-moonstone">
             newest on the right · diamonds are checkpoints · dashed links follow an erasure
           </span>
         </CardHeader>
@@ -114,7 +114,7 @@ export default async function LedgerPage() {
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-hairline text-left text-xs text-dim">
+                <tr className="border-b border-hairline text-left text-xs text-moonstone">
                   <th className="pb-2 font-medium">Seq</th>
                   <th className="pb-2 font-medium">Merkle root</th>
                   <th className="pb-2 font-medium">Entries</th>
@@ -176,13 +176,13 @@ export default async function LedgerPage() {
                     >
                       {presentation.label}
                     </span>
-                    <span className="tabular w-20 shrink-0 font-mono text-xs text-dim">
+                    <span className="tabular w-20 shrink-0 font-mono text-xs text-moonstone">
                       {entry.shard_id}/{entry.seq}
                     </span>
                     <span className="min-w-0 flex-1 truncate text-moonstone">
                       {entry.subject_key ?? <span className="text-dim">—</span>}
                     </span>
-                    <span className="font-mono text-xs text-dim">{entry.actor}</span>
+                    <span className="font-mono text-xs text-moonstone">{entry.actor}</span>
                     <HashLink value={entry.entry_hash} head={6} tail={4} />
                     <span className="w-24 shrink-0 text-right text-xs text-dim">
                       {relativeTime(entry.committed_at)}
@@ -225,21 +225,22 @@ function Verdict({
   detail: string;
   caveat: string;
 }) {
+  // `null` ("the verifier did not answer") and `false` ("the chain is
+  // broken") used to render as the same badLabel — on a page whose whole
+  // argument is "a single tick would collapse a distinction the security
+  // story depends on," conflating those two was that exact failure.
+  const label = ok === true ? okLabel : ok === false ? badLabel : "UNKNOWN";
+  const className =
+    ok === true
+      ? "rounded-sm border border-synapse-edge bg-synapse-fill px-2 py-0.5 text-xs font-semibold text-synapse"
+      : ok === false
+        ? "rounded-sm border border-signal-edge bg-signal-fill px-2 py-0.5 text-xs font-semibold text-signal"
+        : "rounded-sm border border-hairline bg-veil-hi px-2 py-0.5 text-xs font-semibold text-moonstone";
   return (
     <Card>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
-        <span
-          className={
-            ok === true
-              ? "rounded-sm border border-synapse-edge bg-synapse-fill px-2 py-0.5 text-xs font-semibold text-synapse"
-              : ok === false
-                ? "rounded-sm border border-signal-edge bg-signal-fill px-2 py-0.5 text-xs font-semibold text-signal"
-                : "rounded-sm border border-hairline bg-veil-hi px-2 py-0.5 text-xs font-semibold text-dim"
-          }
-        >
-          {ok === true ? okLabel : ok === false ? badLabel : badLabel}
-        </span>
+        <span className={className}>{label}</span>
       </CardHeader>
       <CardBody className="flex flex-col gap-2">
         <p className="text-sm text-parchment">{detail}</p>

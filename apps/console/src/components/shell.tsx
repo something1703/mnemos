@@ -1,7 +1,7 @@
 import Link from "next/link";
 import {
   Activity,
-  ArrowUpRight,
+  ArrowLeft,
   Clock,
   FileSearch,
   Globe2,
@@ -56,9 +56,12 @@ export async function Shell({ children }: { children: React.ReactNode }) {
           </Link>
           <Link
             href="/"
-            className="mb-4 flex items-center gap-1 px-2 text-[11px] text-dim transition-colors hover:text-moonstone"
+            className="mb-4 flex items-center gap-1 px-2 text-xs text-moonstone transition-colors hover:text-parchment"
           >
-            mnemos.dev <ArrowUpRight className="size-3" aria-hidden />
+            {/* Not a domain — PRODUCT.md is explicit that there is no public
+                URL yet. This links back to "/" within the same deployment,
+                which is real. */}
+            <ArrowLeft className="size-3" aria-hidden /> Back to the site
           </Link>
 
           <TenantSwitcher tenants={[...tenants]} active={active} />
@@ -68,7 +71,7 @@ export async function Shell({ children }: { children: React.ReactNode }) {
           ))}
 
           <div className="my-3 border-t border-hairline" />
-          <p className="px-2 pb-1 text-[10px] font-medium tracking-wide text-dim uppercase">
+          <p className="px-2 pb-1 text-xs font-medium tracking-wide text-moonstone uppercase">
             Irreversible
           </p>
           {DESTRUCTIVE_NAV.map(({ href, label, icon: Icon }) => (

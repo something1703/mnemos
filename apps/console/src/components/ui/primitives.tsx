@@ -57,7 +57,7 @@ export function Stat({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-xs font-medium tracking-wide text-dim uppercase">{label}</span>
+      <span className="text-xs font-medium tracking-wide text-moonstone uppercase">{label}</span>
       <span
         className={cn(
           "tabular font-display tracking-[-0.02em]",

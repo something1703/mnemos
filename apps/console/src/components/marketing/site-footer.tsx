@@ -10,7 +10,7 @@ export function SiteFooter() {
             <Logo size={18} className="text-dim" />
             <span className="font-display text-sm text-moonstone">Mnemos</span>
           </div>
-          <p className="max-w-sm text-xs text-dim">
+          <p className="max-w-sm text-xs text-moonstone">
             Built on{" "}
             <a
               href="https://www.cockroachlabs.com/"
@@ -53,7 +53,7 @@ function FooterGroup({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-[10px] font-medium tracking-wide text-dim uppercase">{title}</span>
+      <span className="text-xs font-medium tracking-wide text-dim uppercase">{title}</span>
       {links.map((l) => (
         <Link
           key={l.href}

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { ArrowRight, Radar } from "lucide-react";
 import {
   Button,
@@ -14,6 +15,14 @@ import { TrustBadge } from "@/components/ui/trust-badge";
 import { HashLink } from "@/components/ui/hash-link";
 import { AdminKeyField, ConfirmGate, callAdmin } from "@/components/admin-gate";
 import type { TrustState } from "@/lib/brand";
+
+/** A real, live episode on the ops tenant — the seeded, deliberately poisoned
+ * "postmortem" from db/seed.py (queried directly against the deployed
+ * cluster, 2026-08-17): reads like remediation advice, carries an embedded
+ * instruction, and is exactly what this screen exists to trace. Not fixture
+ * data invented for this link — the actual Phase 10 red-team target. */
+const EXAMPLE_TENANT = "ops";
+const EXAMPLE_EVENT_ID = "65a7c0ba-1ff7-4ad5-a593-03fa15984aa6";
 
 interface BlastResult {
   summary: string;
@@ -48,6 +57,7 @@ const HOPS = [
 ] as const;
 
 export function BlastRadius() {
+  const router = useRouter();
   const [eventIds, setEventIds] = React.useState("");
   const [adminKey, setAdminKey] = React.useState("");
   const [reason, setReason] = React.useState("");
@@ -55,6 +65,26 @@ export function BlastRadius() {
   const [revoked, setRevoked] = React.useState<RevokeResult | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
+  const [switching, setSwitching] = React.useState(false);
+
+  async function tryExample() {
+    setSwitching(true);
+    try {
+      // /api/blast-radius resolves the tenant key fresh on every request
+      // (lib/api/mcp.ts), so the cookie POST alone is enough for the trace
+      // itself. router.refresh() (not a full reload) re-renders the sidebar
+      // tenant switcher to match, without losing this component's state.
+      await fetch("/api/tenant", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ slug: EXAMPLE_TENANT }),
+      });
+      setEventIds(EXAMPLE_EVENT_ID);
+      router.refresh();
+    } finally {
+      setSwitching(false);
+    }
+  }
 
   const ids = eventIds
     .split(/[\s,]+/)
@@ -115,15 +145,28 @@ export function BlastRadius() {
             aria-label="Source event ids"
             className="w-full rounded border border-hairline bg-veil px-3 py-2 font-mono text-sm text-parchment placeholder:font-body placeholder:text-dim"
           />
-          <Button
-            variant="primary"
-            onClick={preview}
-            disabled={ids.length === 0 || pending}
-            className="w-fit"
-          >
-            <Radar className="size-4" aria-hidden />
-            {pending && !revoked ? "Tracing…" : "Trace blast radius"}
-          </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              variant="primary"
+              onClick={preview}
+              disabled={ids.length === 0 || pending}
+              className="w-fit"
+            >
+              <Radar className="size-4" aria-hidden />
+              {pending && !revoked ? "Tracing…" : "Trace blast radius"}
+            </Button>
+            <button
+              type="button"
+              onClick={tryExample}
+              disabled={switching}
+              className="inline-flex items-center gap-1.5 text-left text-xs text-synapse hover:underline disabled:opacity-60"
+            >
+              {switching
+                ? "Switching to the ops tenant…"
+                : "Try the seeded example — a poisoned postmortem, real and live"}
+              {!switching ? <ArrowRight className="size-3" aria-hidden /> : null}
+            </button>
+          </div>
         </CardBody>
       </Card>
 
@@ -141,7 +184,7 @@ export function BlastRadius() {
           <Card>
             <CardHeader>
               <CardTitle>Contamination graph</CardTitle>
-              <span className="font-mono text-xs text-dim">{blast.summary}</span>
+              <span className="font-mono text-xs text-moonstone">{blast.summary}</span>
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
               {/* Counts per hop, laid out as the actual path contamination
@@ -201,7 +244,7 @@ export function BlastRadius() {
                         }
                       />
                       <span className="font-mono text-xs text-parchment">{fact.subject_key}</span>
-                      <span className="text-xs text-dim">depth {fact.depth}</span>
+                      <span className="text-xs text-moonstone">depth {fact.depth}</span>
                       <HashLink value={fact.fact_id} className="ml-auto" head={6} tail={4} />
                     </li>
                   ))}
@@ -255,7 +298,7 @@ export function BlastRadius() {
               <CardBody className="flex flex-col gap-4">
                 <AdminKeyField value={adminKey} onChange={setAdminKey} />
                 <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-medium tracking-wide text-dim uppercase">
+                  <span className="text-xs font-medium tracking-wide text-moonstone uppercase">
                     Reason (recorded in the audit row)
                   </span>
                   <input
@@ -299,7 +342,7 @@ function Line({ label, value, hint }: { label: string; value: number; hint: stri
         <span className="text-moonstone">{label}</span>
         <span className="tabular font-mono text-parchment">{value}</span>
       </div>
-      <span className="text-xs text-dim">{hint}</span>
+      <span className="text-xs text-moonstone">{hint}</span>
     </div>
   );
 }

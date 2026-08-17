@@ -141,7 +141,7 @@ export function ForgetFlow({
           ) : null}
 
           <fieldset className="flex flex-col gap-2">
-            <legend className="pb-1 text-xs font-medium tracking-wide text-dim uppercase">
+            <legend className="pb-1 text-xs font-medium tracking-wide text-moonstone uppercase">
               Mode
             </legend>
             <div className="grid gap-2 sm:grid-cols-2">
@@ -155,7 +155,7 @@ export function ForgetFlow({
                       selected
                         ? key === "shred"
                           ? "border-signal-edge bg-signal-fill"
-                          : "border-synapse-edge bg-synapse-fill"
+                          : "border-parchment/40 bg-veil-hi"
                         : "border-hairline bg-veil-hi/40 hover:border-moonstone/40"
                     }`}
                   >
@@ -173,12 +173,12 @@ export function ForgetFlow({
                       />
                       <span className="font-display text-sm text-parchment">{info.title}</span>
                       {info.reversible ? (
-                        <span className="rounded-sm border border-synapse-edge px-1.5 text-[10px] text-synapse">
+                        <span className="rounded-sm border border-synapse-edge px-1.5 text-xs text-synapse">
                           reversible
                         </span>
                       ) : null}
                       {key === "shred" ? (
-                        <span className="ml-auto rounded-sm border border-signal-edge bg-signal-fill px-1.5 text-[10px] font-semibold text-signal">
+                        <span className="ml-auto rounded-sm border border-signal-edge bg-signal-fill px-1.5 text-xs font-semibold text-signal">
                           {info.scope}
                         </span>
                       ) : null}
@@ -193,7 +193,7 @@ export function ForgetFlow({
           <AdminKeyField value={adminKey} onChange={setAdminKey} />
 
           <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium tracking-wide text-dim uppercase">
+            <span className="text-xs font-medium tracking-wide text-moonstone uppercase">
               Reason (recorded in the audit row)
             </span>
             <input
@@ -228,7 +228,7 @@ export function ForgetFlow({
         <Card>
           <CardHeader>
             <CardTitle>Exactly what {chosen.title.toLowerCase()} would do</CardTitle>
-            <span className="text-xs text-dim">nothing has happened yet</span>
+            <span className="text-xs text-moonstone">nothing has happened yet</span>
           </CardHeader>
           <CardBody className="flex flex-col gap-4">
             <div className="grid gap-3 sm:grid-cols-3">
@@ -334,7 +334,7 @@ function Proof({
             </span>
           )}
           {verify?.entries_checked ? (
-            <span className="text-xs text-dim">over {verify.entries_checked} entries</span>
+            <span className="text-xs text-moonstone">over {verify.entries_checked} entries</span>
           ) : null}
         </div>
 

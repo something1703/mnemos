@@ -27,7 +27,7 @@ export function AdminKeyField({
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="flex items-center gap-2 text-xs font-medium tracking-wide text-dim uppercase">
+      <span className="flex items-center gap-2 text-xs font-medium tracking-wide text-moonstone uppercase">
         <KeyRound className="size-3.5" aria-hidden />
         {label}
       </span>
@@ -40,7 +40,7 @@ export function AdminKeyField({
         placeholder="mn_live_…"
         className="h-10 w-full rounded border border-hairline bg-veil px-3 font-mono text-sm text-parchment placeholder:font-body placeholder:text-dim"
       />
-      <span className="text-xs text-dim">
+      <span className="text-xs text-moonstone">
         Used for this one call and never stored — not in local storage, not in a cookie. Leaving
         this page discards it.
       </span>

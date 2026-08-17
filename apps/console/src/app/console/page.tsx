@@ -73,7 +73,7 @@ export default async function OverviewPage() {
                 accent="synapse"
                 hint="Deliberately not “facts stored”. The number that matters is the number you would act on."
               />
-              <p className="text-xs text-dim">
+              <p className="text-xs text-moonstone">
                 {formatCount(unverified)} more are written but unverified, and are withheld from
                 recall until something independent corroborates them.
               </p>
@@ -169,15 +169,31 @@ export default async function OverviewPage() {
               </Link>
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
-              <div className="flex items-center gap-3">
+              {/* Two badges, not one — a single tick here would be exactly
+                  the collapsed distinction the Ledger page's own module
+                  docstring warns against: internal consistency and external
+                  anchoring are different verdicts with different attackers
+                  they defend against. */}
+              <div className="flex flex-wrap items-center gap-3">
                 <span
                   className={
-                    verdict?.valid
-                      ? "rounded-sm border border-synapse-edge bg-synapse-fill px-2 py-0.5 text-xs font-semibold text-synapse"
-                      : "rounded-sm border border-signal-edge bg-signal-fill px-2 py-0.5 text-xs font-semibold text-signal"
+                    verdict === undefined || verdict === null
+                      ? "rounded-sm border border-hairline bg-veil-hi px-2 py-0.5 text-xs font-semibold text-moonstone"
+                      : verdict.valid
+                        ? "rounded-sm border border-synapse-edge bg-synapse-fill px-2 py-0.5 text-xs font-semibold text-synapse"
+                        : "rounded-sm border border-signal-edge bg-signal-fill px-2 py-0.5 text-xs font-semibold text-signal"
                   }
                 >
                   {verdict ? (verdict.valid ? "VALID" : "BROKEN") : "UNKNOWN"}
+                </span>
+                <span
+                  className={
+                    latestCheckpoint?.anchored
+                      ? "rounded-sm border border-synapse-edge bg-synapse-fill px-2 py-0.5 text-xs font-semibold text-synapse"
+                      : "rounded-sm border border-ember-edge bg-ember-fill px-2 py-0.5 text-xs font-semibold text-ember"
+                  }
+                >
+                  {latestCheckpoint?.anchored ? "ANCHORED" : "NOT ANCHORED"}
                 </span>
                 <span className="text-sm text-moonstone">
                   {verdict
@@ -219,7 +235,7 @@ export default async function OverviewPage() {
           <Card className="h-full">
             <CardHeader>
               <CardTitle>Posture</CardTitle>
-              <span className="text-xs text-dim">measured, not configured</span>
+              <span className="text-xs text-moonstone">measured, not configured</span>
             </CardHeader>
             <CardBody>
               <dl className="flex flex-col gap-2 text-sm">

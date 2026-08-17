@@ -135,7 +135,7 @@ export default function HowItWorksPage() {
                     </span>
                     <div className="flex flex-col gap-1">
                       <p className="text-sm text-parchment">{inv.title}</p>
-                      <p className="text-xs text-dim">{inv.by}</p>
+                      <p className="text-xs text-moonstone">{inv.by}</p>
                     </div>
                   </CardBody>
                 </Card>

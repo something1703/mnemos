@@ -70,7 +70,7 @@ export function SearchForm({
           className="size-3.5 accent-[var(--umbra)]"
         />
         Include unverified facts
-        <span className="text-dim">— what the agent would normally not be shown</span>
+        <span className="text-moonstone">— what the agent would normally not be shown</span>
       </label>
     </form>
   );

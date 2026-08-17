@@ -92,7 +92,7 @@ export default async function ResidencyPage() {
       <Card>
         <CardHeader>
           <CardTitle>Region lanes</CardTitle>
-          <span className="text-xs text-dim">where facts are homed right now</span>
+          <span className="text-xs text-moonstone">where facts are homed right now</span>
         </CardHeader>
         <CardBody>
           {regions.length === 0 ? (
@@ -136,7 +136,7 @@ export default async function ResidencyPage() {
       <Card>
         <CardHeader>
           <CardTitle>Border crossings</CardTitle>
-          <span className="text-xs text-dim">refusals shown in umbra</span>
+          <span className="text-xs text-moonstone">refusals shown in umbra</span>
         </CardHeader>
         <CardBody>
           {crossings.length === 0 ? (
@@ -164,7 +164,7 @@ export default async function ResidencyPage() {
                   <span className="min-w-0 flex-1 truncate font-mono text-xs text-parchment">
                     {c.subject_key}
                   </span>
-                  <span className="text-xs text-dim">{c.policy_applied ?? c.projection ?? "—"}</span>
+                  <span className="text-xs text-moonstone">{c.policy_applied ?? c.projection ?? "—"}</span>
                   <span className="w-24 shrink-0 text-right text-xs text-dim">
                     {relativeTime(c.occurred_at)}
                   </span>
@@ -181,7 +181,7 @@ export default async function ResidencyPage() {
       <Card>
         <CardHeader>
           <CardTitle>Legal holds</CardTitle>
-          <span className="text-xs text-dim">erasure is refused while one stands</span>
+          <span className="text-xs text-moonstone">erasure is refused while one stands</span>
         </CardHeader>
         <CardBody>
           {holds.length === 0 ? (
