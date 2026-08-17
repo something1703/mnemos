@@ -3,7 +3,6 @@ import { Globe2, ShieldCheck, GitBranch, ArrowRight } from "lucide-react";
 import { getStats, getLedger } from "@/lib/api/queries";
 import { apiConfigured } from "@/lib/api/server";
 import { Button } from "@/components/ui/primitives";
-import { Logo } from "@/components/ui/logo";
 import { CountUp } from "@/components/ui/count-up";
 import { TrustLatticeDiagram } from "@/components/marketing/trust-lattice-diagram";
 import { MemoryTrace, type TraceCommit } from "@/components/viz/memory-trace";
@@ -14,14 +13,17 @@ export const revalidate = 30;
 
 /** Tailwind cannot see a class name assembled with `${}` at build time — the
  * same escape hatch `ACCENT_CLASSES` (lib/brand.ts) documents, applied here
- * for the two accents this page needs literally. */
+ * for the accents this page needs literally. One dot-color map reused by
+ * both the pillar nodes and the plane rows, so "this accent, this meaning"
+ * reads as the same visual language in both places rather than two. */
 const ICON_ACCENT_CLASS = {
   synapse: "text-synapse",
   ember: "text-ember",
   signal: "text-signal",
 } as const;
 
-const DOT_ACCENT_CLASS = {
+const ACCENT_BG = {
+  synapse: "bg-synapse",
   ember: "bg-ember",
   parchment: "bg-moonstone",
   signal: "bg-signal",
@@ -152,49 +154,75 @@ export default async function LandingPage() {
 
   return (
     <>
-      {/* ------------------------------------------------------------ hero */}
-      <section className="mx-auto flex max-w-4xl flex-col items-center gap-8 px-5 pt-20 pb-10 text-center md:px-8 md:pt-28">
-        <Logo size={56} className="text-synapse" animate />
-        <div className="flex flex-col gap-4">
-          <h1 className="font-display text-4xl leading-[1.05] tracking-[-0.02em] text-parchment md:text-6xl">
-            Accountable memory
-            <br />
-            for agents.
+      {/* ------------------------------------------------------------ hero
+          No second logo mark here — the nav directly above already carries
+          it, and repeating the glyph, centered, at hero scale is exactly
+          the template gesture: brand asserted twice in one viewport instead
+          of once. The gradient wash makes DESIGN.md's own north star
+          ("long-exposure neuron microscopy... deep indigo depths with
+          bioluminescent traces") a rendered fact of the page rather than a
+          claim in a markdown file the flat abyss background never paid
+          off. The headline keeps the two-line brand copy verbatim
+          (BRAND.md's positioning line) but stops setting both lines at
+          identical weight — the second line steps down, which is a real
+          typographic decision instead of the default "one giant centered
+          block" every generated hero reaches for. The two calls to action
+          are no longer a matched pair of pill buttons: one is the action,
+          one is a way out of it. */}
+      <section className="relative overflow-hidden">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[32rem]"
+          style={{
+            background:
+              "radial-gradient(42% 55% at 20% 0%, rgb(111 227 210 / 16%), transparent 68%), radial-gradient(38% 46% at 86% 8%, rgb(139 127 212 / 13%), transparent 65%)",
+          }}
+        />
+        <div className="mx-auto flex max-w-4xl flex-col items-center gap-8 px-5 pt-24 pb-10 text-center md:px-8 md:pt-32">
+          <h1 className="flex flex-col items-center font-display tracking-[-0.02em]">
+            <span className="text-4xl leading-[1.05] text-parchment md:text-6xl">
+              Accountable memory
+            </span>
+            <span className="text-2xl leading-[1.15] text-moonstone md:text-4xl">for agents.</span>
           </h1>
           <p className="mx-auto max-w-2xl text-balance text-moonstone md:text-lg">
             Agents don&rsquo;t fail when they&rsquo;re wrong. They fail when they forget — or when
             they remember what they never should have.
           </p>
-        </div>
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          <Button asChild size="lg" variant="primary">
-            <Link href="/console">
-              Open the console <ArrowRight className="size-4" aria-hidden />
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
+            <Button asChild size="lg" variant="primary">
+              <Link href="/console">
+                Open the console <ArrowRight className="size-4" aria-hidden />
+              </Link>
+            </Button>
+            <Link
+              href="/how-it-works"
+              className="text-sm text-moonstone underline decoration-hairline underline-offset-4 transition-colors hover:text-parchment"
+            >
+              See how it works
             </Link>
-          </Button>
-          <Button asChild size="lg" variant="default">
-            <Link href="/how-it-works">See how it works</Link>
-          </Button>
-        </div>
-
-        {/* The brand's own signature element (BRAND.md: "the one bold
-            element... a live feed of the tenant's real ledger commits") had
-            never once appeared outside /console — on the surface that
-            actually has to make the case to a judge in the first few
-            seconds, the most distinctive and least fakeable thing this
-            product has was simply absent. This is the same MemoryTrace the
-            console footer runs, fed by the same real data. Unboxed — a
-            ledger tear-off between two hairlines, not another rounded card,
-            and its own left-to-right draw-in is the hero's one motion
-            moment, so nothing here wraps it in a second, redundant fade. */}
-        {commits.length > 0 ? (
-          <div className="w-full max-w-2xl border-y border-hairline py-3">
-            <p className="mb-2 text-xs text-moonstone">
-              The last {commits.length} rows committed to the audit chain — right now.
-            </p>
-            <MemoryTrace commits={commits} height={40} />
           </div>
-        ) : null}
+
+          {/* The brand's own signature element (BRAND.md: "the one bold
+              element... a live feed of the tenant's real ledger commits")
+              had never once appeared outside /console — on the surface that
+              actually has to make the case to a judge in the first few
+              seconds, the most distinctive and least fakeable thing this
+              product has was simply absent. This is the same MemoryTrace
+              the console footer runs, fed by the same real data. Unboxed —
+              a ledger tear-off between two hairlines, not another rounded
+              card, and its own left-to-right draw-in is the hero's one
+              motion moment, so nothing here wraps it in a second,
+              redundant fade. */}
+          {commits.length > 0 ? (
+            <div className="w-full max-w-3xl border-y border-hairline py-3">
+              <p className="mb-2 text-xs text-moonstone">
+                The last {commits.length} rows committed to the audit chain — right now.
+              </p>
+              <MemoryTrace commits={commits} height={44} />
+            </div>
+          ) : null}
+        </div>
       </section>
 
       {/* ------------------------------------------------------- live stats */}
@@ -238,19 +266,34 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* ---------------------------------------------------------- pillars */}
-      <section className="border-t border-hairline bg-veil/20 py-20">
+      {/* ---------------------------------------------------------- pillars
+          Nodes on a spine, not boxed icon-cards — the same dot-and-line
+          grammar the memory trace and the four planes below both use, so
+          "three pillars" reads as this product's own visual language
+          rather than a stock feature-grid dressed in the brand's colors. */}
+      <section className="border-t border-hairline bg-veil/20 py-24">
         <div className="mx-auto max-w-5xl px-5 md:px-8">
-          <h2 className="mb-12 font-display text-2xl tracking-[-0.02em] text-parchment md:text-3xl">
+          <h2 className="mb-16 font-display text-2xl tracking-[-0.02em] text-parchment md:text-3xl">
             Three pillars
           </h2>
-          <div className="grid divide-y divide-hairline border-y border-hairline md:grid-cols-3 md:divide-x md:divide-y-0">
+          <div className="relative grid gap-10 md:grid-cols-3 md:gap-8">
+            <div aria-hidden className="absolute inset-x-0 top-0 hidden h-px bg-hairline md:block" />
             {PILLARS.map((p) => (
-              <Link key={p.title} href={p.href} className="group flex flex-col gap-3 px-6 py-8">
+              <Link key={p.title} href={p.href} className="group relative flex flex-col gap-2.5">
+                {/* A solid dot, painted after the spine in DOM order, covers
+                    the 1px line beneath it — no color-matched ring needed to
+                    fake a cutout against a translucent section background. */}
+                <span
+                  aria-hidden
+                  className={cn(
+                    "absolute -top-[29px] left-0 hidden size-3 rounded-full md:block",
+                    ACCENT_BG[p.accent],
+                  )}
+                />
                 <p.icon className={cn("size-5", ICON_ACCENT_CLASS[p.accent])} aria-hidden />
                 <p className="font-display text-lg text-parchment">{p.title}</p>
                 <p className="text-sm text-moonstone">{p.body}</p>
-                <span className="mt-auto flex items-center gap-1 pt-2 text-xs text-synapse opacity-0 transition-opacity group-hover:opacity-100">
+                <span className="flex items-center gap-1 pt-1 text-xs text-synapse opacity-0 transition-opacity group-hover:opacity-100">
                   Open in console <ArrowRight className="size-3" aria-hidden />
                 </span>
               </Link>
@@ -288,7 +331,7 @@ export default async function LandingPage() {
               >
                 <span className="flex w-44 shrink-0 items-center gap-2">
                   <span
-                    className={cn("size-2 shrink-0 rounded-full", DOT_ACCENT_CLASS[p.accent])}
+                    className={cn("size-2 shrink-0 rounded-full", ACCENT_BG[p.accent])}
                     aria-hidden
                   />
                   <span className="font-display text-sm text-parchment">{p.name}</span>
