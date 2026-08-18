@@ -71,11 +71,11 @@ const NODE_SPEC: Record<
   NodeId,
   { trust: TrustState; note?: string; small?: boolean; x: number; y: number; width: number; height: number; order: number }
 > = {
-  unverified: { trust: "unverified", note: "everything an LLM writes lands here", x: 0, y: 60, width: 150, height: 68, order: 0 },
-  corroborated: { trust: "corroborated", x: 340, y: 60, width: 140, height: 34, order: 2 },
-  trusted: { trust: "trusted", note: "returned by recall", x: 680, y: 60, width: 130, height: 54, order: 4 },
-  contested: { trust: "contested", note: "a comparable claim disagrees", x: 170, y: 260, small: true, width: 145, height: 62, order: 5 },
-  quarantined: { trust: "quarantined", note: "withdrawn from recall", x: 510, y: 260, small: true, width: 145, height: 62, order: 7 },
+  unverified: { trust: "unverified", note: "everything an LLM writes lands here", x: 0, y: 30, width: 150, height: 68, order: 0 },
+  corroborated: { trust: "corroborated", x: 340, y: 30, width: 140, height: 34, order: 2 },
+  trusted: { trust: "trusted", note: "returned by recall", x: 680, y: 30, width: 130, height: 54, order: 4 },
+  contested: { trust: "contested", note: "a comparable claim disagrees", x: 170, y: 145, small: true, width: 145, height: 62, order: 5 },
+  quarantined: { trust: "quarantined", note: "withdrawn from recall", x: 510, y: 145, small: true, width: 145, height: 62, order: 7 },
 };
 
 const EDGE_SPEC: Array<{ id: string; source: NodeId; target: NodeId; label: string; order: number }> = [
@@ -215,13 +215,13 @@ export function TrustLatticeDiagram() {
   // measured size, so onInit calls it again once react-flow's internal
   // store is actually ready.
   const onInit = React.useCallback((instance: ReactFlowInstance<Node<LatticeNodeData>, Edge>) => {
-    instance.fitView({ padding: 0.2 });
+    instance.fitView({ padding: 0.12 });
   }, []);
 
   return (
     <div className="flex flex-col gap-3">
       <div
-        className="h-[230px] w-full md:h-[260px]"
+        className="h-[170px] w-full md:h-[190px]"
         role="img"
         aria-label="The trust lattice: how a claim moves from unverified to corroborated to trusted, or from contested to quarantined"
       >
@@ -230,10 +230,10 @@ export function TrustLatticeDiagram() {
           edges={edges}
           nodeTypes={NODE_TYPES}
           fitView
-          fitViewOptions={{ padding: 0.2 }}
+          fitViewOptions={{ padding: 0.12 }}
           onInit={onInit}
           minZoom={0.4}
-          maxZoom={1.25}
+          maxZoom={1}
           panOnDrag={false}
           panOnScroll={false}
           zoomOnScroll={false}
