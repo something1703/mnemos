@@ -13,6 +13,7 @@
 </p>
 
 <p align="center">
+  <a href="https://mnemos-beta.vercel.app">Live console</a> ·
   <a href="#quickstart">Quickstart</a> ·
   <a href="#architecture">Architecture</a> ·
   <a href="#the-four-demo-moments">Demos</a> ·
@@ -96,25 +97,39 @@ Each has a named test in `tests/invariants/`. Run `make invariants`.
 ![Mnemos architecture](docs/img/architecture.svg)
 
 The write path (Lambda) does **zero AI work** — memory intake survives a total
-Bedrock outage, and we prove it in `demos/resilience.sh`. All AI work happens
-asynchronously in the Step Functions sleep cycle. The Warden is a separate
-Lambda behind an IAM boundary. The Custodian is the only component touching
-the Cloud MCP Server — read-only, cluster-scoped, allowlisted SQL only.
+Bedrock outage. All AI work happens asynchronously in the Step Functions sleep
+cycle. The Warden's operations connect through their own database role
+(`mnemos_warden_svc`) — the only one with `DELETE` — separate from the API's
+ordinary role, and that separation is measured at runtime, not assumed. The
+Custodian is the only component touching the Cloud MCP Server — read-only,
+cluster-scoped, allowlisted SQL only.
 
 Full narrative: [docs/architecture.md](docs/architecture.md) ·
 Decisions: [docs/decisions.md](docs/decisions.md) ·
 Threat model: [docs/threat-model.md](docs/threat-model.md) ·
-Governance: [docs/governance.md](docs/governance.md)
+Governance: [docs/governance.md](docs/governance.md) ·
+Runbook: [docs/runbook.md](docs/runbook.md)
+
+## See it live — no key required
+
+**[mnemos-beta.vercel.app](https://mnemos-beta.vercel.app)** is the real
+console against the real deployed instance: live stats, the trust lattice,
+the audit chain, and all nine governance screens (Explorer, Time Machine,
+Residency, Ledger, Custodian, Deposition, Blast Radius, Forget). Switch
+between the three demo tenants — clinic, security ops, and consumer finance —
+from the sidebar; each is genuinely isolated data, not three views of the
+same seed. This is the fastest way to see the three pillars actually working:
+`/how-it-works` walks through the mechanism, then the console shows it live.
 
 ## Quickstart
 
 ```bash
-git clone https://github.com/<org>/mnemos && cd mnemos
+git clone https://github.com/something1703/mnemos && cd mnemos
 make setup            # toolchain + deps
 make db-local         # single-node CockroachDB in Docker
 make db-migrate       # 3 tiers, residency, RLS, TTL, sharded ledger, triggers
 make invariants       # watch all five invariants hold (~60s)
-make demo-continuity  # cross-border clinic: recall, residency, erasure, hold
+make check            # 439 unit tests + 118 invariant tests + red team, lint, typecheck
 ```
 
 Want the residency and node-kill story? `make db-multiregion` brings up a
@@ -146,7 +161,7 @@ Connect your own agent (Claude Code shown; Cursor, LangGraph and plain-SDK
 snippets in [docs/clients.md](docs/clients.md)):
 
 ```console
-$ claude mcp add --transport http mnemos https://<host>/mcp \
+$ claude mcp add --transport http mnemos https://l78rw3uwyb.execute-api.us-east-1.amazonaws.com/mcp \
     --header "Authorization: Bearer mn_live_..."
 ```
 
@@ -178,10 +193,12 @@ $ make smoke
    then `recall("any hot queries lately?")` answers from the fabric's memory of
    its own operations.
 
-Three verticals run as three tenants on one fabric —
-[Continuity](demos/continuity/) (healthcare, residency),
-[Contagion](demos/contagion/) (security, integrity),
-[Deposition](demos/deposition/) (finance, accountability).
+Three verticals run as three tenants on one fabric, live on the deployed
+instance, not staged for a script: **Continuity** (clinic — healthcare,
+residency), **Contagion** (security ops — integrity), **Deposition**
+(consumer finance — accountability). Switch tenants in the
+[live console](https://mnemos-beta.vercel.app/console) sidebar to walk
+through any of the three yourself.
 
 ## What we do not claim
 
@@ -225,11 +242,11 @@ published the attacks that succeeded alongside the ones that didn't.
 |---|---|
 | **Distributed Vector Indexing** | C-SPANN prefix-scoped by `tenant_id` — isolation inside the index, not just the WHERE clause; hybrid vector + full-text with RRF via [langchain-cockroachdb](https://docs.langchain.com/oss/python/integrations/providers/cockroachdb); vectors die transactionally with their rows, which *is* the erasure guarantee |
 | **Cloud MCP Server** | The Custodian connects read-only with `mcp-cluster-id` scoping, executes only SQL allowlisted from official skills, paginates around the 25-row / 10KiB limits by design |
-| **Agent Skills** | Five consumed (`triaging-live-sql-activity`, `profiling-statement-fingerprints`, `reviewing-cluster-health`, `analyzing-range-distribution`, `cockroachdb-sql` for continuous schema review) — and **two contributed upstream** into the empty integrations domain: [`designing-agentic-memory-schemas`](#), [`auditing-agent-memory-with-as-of-system-time`](#) |
+| **Agent Skills** | Five consumed (`triaging-live-sql-activity`, `profiling-statement-fingerprints`, `reviewing-cluster-health`, `analyzing-range-distribution`, `cockroachdb-sql` for continuous schema review) — and **two contributed upstream**, distilled from this build: [`designing-agentic-memory-schemas`](https://github.com/cockroachlabs/cockroachdb-skills/pull/27) (Query and Schema Design), [`auditing-agent-memory-with-as-of-system-time`](https://github.com/cockroachlabs/cockroachdb-skills/pull/28) (Security and Governance) |
 | **ccloud CLI** | Control-plane facts MCP cannot provide: cluster inventory, region topology feeding the residency map, and backup recency — which becomes a critical finding when it exceeds the tenant's RPO |
 | **Other CockroachDB depth** | `REGIONAL BY ROW` + survival goals, `AS OF SYSTEM TIME`, CHANGEFEED revocation bus, Row-Level TTL, RLS, DB-enforced audit trigger, serializable txns with 40001 retry, sharded chains benchmarked to 16× |
 | **AWS services** | **Bedrock** (distillation, contradiction judging, Titan Embed v2), **Lambda** (MCP API, consolidation, decay, Warden), **Step Functions** (sleep-cycle orchestration), **ECS Fargate** (Custodian), **EventBridge** (scheduling + alarm triggers), **S3 + Object Lock** (immutable Merkle anchoring), **KMS** (per-tenant envelope encryption, crypto-shred), **CloudWatch**, **API Gateway**, **Secrets Manager**, **Amplify** |
-| **Production readiness** | Five invariants with named tests; six-class red-team suite with published failures; [security](docs/security.md) · [limits](docs/limits.md) · [scale](docs/scale.md) · [runbook](docs/runbook.md) · [costs](docs/costs.md); verified backup-restore drill |
+| **Production readiness** | Five invariants with named tests; red-team suite with published failures; [security](docs/security.md) · [limits](docs/limits.md) · [runbook](docs/runbook.md) · [costs](docs/costs.md) — including what we have *not* tested yet, listed by name rather than left implicit |
 
 ## Resources & prior art
 
@@ -249,20 +266,22 @@ well, and precisely which of our claims are genuinely unmatched.
 
 ```
 packages/engine/       memory core: remember / recall / recall_as_of / explain / blast_radius
-packages/warden/       governance core: residency, holds, erasure, revocation, attestation
-services/api/          Mnemos MCP server + REST facade (Lambda)
+packages/warden/       governance core: residency, holds, erasure, revocation, attestation —
+                        reached through its own DELETE-capable database role, not a separate Lambda
+services/api/          Mnemos MCP server + REST facade (Lambda) — the only deployed compute
+                        for the Fabric and the Warden; privilege separation is at the DB layer
 services/sleep-cycle/  consolidation, belief revision, trust promotion, decay (Step Functions)
-services/warden/       the only service with DELETE — and no model dependency
 services/custodian/    Fargate agent: Cloud MCP + ccloud + official Agent Skills
-apps/console/          Next.js: Explorer, Time Machine, Residency, Ledger, Blast Radius, Deposition, Forget
-demos/                 continuity · contagion · deposition · resilience
-redteam/               six attack classes, run in CI
-bench/                 shard scaling, vector scaling, blast-radius scaling
+apps/console/          Next.js: Explorer, Time Machine, Residency, Ledger, Blast Radius, Deposition, Forget —
+                        live at mnemos-beta.vercel.app
+demos/                 sleep_demo — converse, consolidate, watch trust promote live
+redteam/               attack suite: memory poisoning and cross-tenant exfiltration, run in CI;
+                        the remaining planned classes are listed, unrun, in docs/redteam.md
 db/                    migrations, seed, verifier, attestation
 scripts/               independent_verify.py — the judge-facing, dependency-free ledger check
 infra/                 IaC per service + observability dashboards
 brand/                 tokens, logo, BRAND.md
-docs/                  architecture, decisions, security, threat model, limits, redteam, scale, runbook
+docs/                  architecture, decisions, security, threat model, limits, redteam, costs, runbook
 ```
 
 *Mnemosyne, Greek goddess of memory, was the mother of the Muses — memory as

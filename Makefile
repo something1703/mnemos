@@ -1,9 +1,8 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
-# Mnemos — see MASTER_PLAN.md. Every target here is referenced by a phase file
-# or by the README quickstart. If a target stops working, the quickstart is
-# broken and Phase 12's judge simulation will fail.
+# Mnemos. Every target here is referenced by the README quickstart or by
+# AGENTS.md. If a target stops working, the quickstart is broken.
 
 .PHONY: help
 help: ## Show this help
@@ -245,7 +244,3 @@ console-check: ## Typecheck, lint and production-build the console
 .PHONY: deploy-console
 deploy-console: ## Deploy the console to Vercel (requires `vercel link` once)
 	cd apps/console && pnpm dlx vercel@latest --prod
-
-.PHONY: redteam
-redteam: ## Phase 10 attack suite against redteam-* tenants (see docs/redteam.md)
-	uv run pytest redteam/ -v

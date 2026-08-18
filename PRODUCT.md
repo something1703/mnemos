@@ -11,11 +11,11 @@ web
 Two audiences, by surface — confirmed by the user rather than inferred, because getting this wrong would misdirect every future design decision through this skill:
 
 - **Persuade surfaces** (`/`, `/how-it-works`): a judge for the CockroachDB × AWS "Build with Agentic Memory" hackathon (submission deadline 2026-08-19), evaluating the project cold, in minutes, against a public Devpost rubric. They have not opened the console before landing here and may never open it at all — the landing page is where the argument has to land.
-- **Operate surfaces** (`/console/*`, the nine dashboard screens): the fictional-but-specific operator persona the three demo verticals are built for — someone governing agent memory inside a regulated vertical, not a generic "user." Concretely: a cross-border clinic operator confirming a patient's raw record never left its home region (Continuity), a DevOps engineer discovering a poisoned runbook and tracing its blast radius (Contagion), and a consumer-finance compliance reviewer producing a regulator-facing deposition for a declined application (Deposition). See PHASE_09_DEMO_VERTICALS.md for the full storylines — these are not marketing personas, they are the literal scripts the demo tenants run.
+- **Operate surfaces** (`/console/*`, the nine dashboard screens): the fictional-but-specific operator persona the three demo verticals are built for — someone governing agent memory inside a regulated vertical, not a generic "user." Concretely: a cross-border clinic operator confirming a patient's raw record never left its home region (Continuity), a DevOps engineer discovering a poisoned runbook and tracing its blast radius (Contagion), and a consumer-finance compliance reviewer producing a regulator-facing deposition for a declined application (Deposition). These are not marketing personas, they are the literal scripts the three live demo tenants (clinic/ops/finance) run — walk any of them in the [live console](https://mnemos-beta.vercel.app/console).
 
 ## Product Purpose
 
-Mnemos is accountable memory for AI agents: a memory layer that answers three questions no shipping agent-memory system answers today (README.md, MASTER_PLAN.md):
+Mnemos is accountable memory for AI agents: a memory layer that answers three questions no shipping agent-memory system answers today (see README.md):
 
 1. **Where does this memory legally live?** — an agent recalling a record in one jurisdiction must not have moved the raw content across a border to do it.
 2. **What did the agent believe, and why did it act?** — a decision needs a deposition (the exact facts as they stood, their provenance, hash-verified), not a log file.
@@ -34,7 +34,7 @@ The mechanism a neighboring product could not truthfully copy without becoming t
 
 ## Operating Context
 
-**The three demo verticals are the real operating scenarios**, each its own tenant on the same fabric (PHASE_09_DEMO_VERTICALS.md):
+**The three demo verticals are the real operating scenarios**, each its own tenant on the same fabric:
 
 - **Continuity** (clinic, residency pillar): episodic write in `eu-central-1`, recall from a different region returns the derived fact only, an erasure request against a legal hold fails loudly and explains why.
 - **Contagion** (DevOps copilot, integrity pillar): a learned playbook lands quarantined until independently corroborated; a poisoned source is shown being *contained*, not prevented — the demo explicitly shows the defense's boundary (two colluding sources still promote a fact) before showing the cure (`blast_radius` → `revoke_source`).

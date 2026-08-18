@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 560" width="900" height="560" role="img" aria-label="Mnemos architecture: one CockroachDB cluster in the center, with the Fabric and Sleep Cycle writing into it, the Warden holding exclusive destructive access, and the Custodian reading it read-only over the Cloud MCP server.">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#a8b3cf"/>
+    </marker>
+    <marker id="arrow-signal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#e4586b"/>
+    </marker>
+    <marker id="arrow-umbra" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#8b7fd4"/>
+    </marker>
+  </defs>
+
+  <rect width="900" height="560" fill="#12172b"/>
+
+  <!-- connecting lines, drawn first so boxes sit on top -->
+  <path d="M240 150 L360 230" stroke="#f2a65a" stroke-width="1.5" marker-end="url(#arrow)" fill="none"/>
+  <path d="M240 330 L360 260" stroke="#f2a65a" stroke-width="1.5" marker-end="url(#arrow)" fill="none"/>
+  <path d="M540 260 L660 150" stroke="#e4586b" stroke-width="1.5" marker-end="url(#arrow-signal)" fill="none"/>
+  <path d="M660 340 L540 270" stroke="#8b7fd4" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow-umbra)" fill="none"/>
+
+  <text x="300" y="185" font-family="ui-monospace, SF Mono, monospace" font-size="12" fill="#a8b3cf">writes, 0 AI work</text>
+  <text x="255" y="305" font-family="ui-monospace, SF Mono, monospace" font-size="12" fill="#a8b3cf">async, on a schedule</text>
+  <text x="565" y="185" font-family="ui-monospace, SF Mono, monospace" font-size="12" fill="#e4586b">destructive ops only</text>
+  <text x="558" y="320" font-family="ui-monospace, SF Mono, monospace" font-size="12" fill="#8b7fd4">read-only, MCP</text>
+
+  <!-- central cluster -->
+  <rect x="360" y="230" width="180" height="100" rx="14" fill="#232b45" stroke="#36415f"/>
+  <circle cx="386" cy="256" r="4" fill="#edeff7"/>
+  <text x="398" y="261" font-family="ui-sans-serif, system-ui" font-size="15" font-weight="600" fill="#edeff7">CockroachDB</text>
+  <text x="376" y="282" font-family="ui-sans-serif, system-ui" font-size="12" fill="#a8b3cf">episodes · facts</text>
+  <text x="376" y="300" font-family="ui-sans-serif, system-ui" font-size="12" fill="#a8b3cf">provenance · ledger</text>
+  <text x="376" y="318" font-family="ui-monospace, SF Mono, monospace" font-size="11" fill="#6f7b9b">one transaction boundary</text>
+
+  <!-- The Fabric -->
+  <rect x="60" y="100" width="180" height="100" rx="14" fill="#232b45" stroke="#36415f"/>
+  <circle cx="86" cy="126" r="4" fill="#f2a65a"/>
+  <text x="98" y="131" font-family="ui-sans-serif, system-ui" font-size="15" font-weight="600" fill="#edeff7">The Fabric</text>
+  <text x="76" y="152" font-family="ui-monospace, SF Mono, monospace" font-size="12" fill="#a8b3cf">remember()</text>
+  <text x="76" y="170" font-family="ui-monospace, SF Mono, monospace" font-size="12" fill="#a8b3cf">recall()</text>
+  <text x="76" y="188" font-family="ui-sans-serif, system-ui" font-size="11" fill="#6f7b9b">Lambda · MCP API</text>
+
+  <!-- Sleep cycle -->
+  <rect x="60" y="280" width="180" height="100" rx="14" fill="#232b45" stroke="#36415f"/>
+  <circle cx="86" cy="306" r="4" fill="#f2a65a"/>
+  <text x="98" y="311" font-family="ui-sans-serif, system-ui" font-size="15" font-weight="600" fill="#edeff7">Sleep Cycle</text>
+  <text x="76" y="332" font-family="ui-sans-serif, system-ui" font-size="12" fill="#a8b3cf">distill · corroborate</text>
+  <text x="76" y="350" font-family="ui-sans-serif, system-ui" font-size="12" fill="#a8b3cf">promote · decay</text>
+  <text x="76" y="368" font-family="ui-sans-serif, system-ui" font-size="11" fill="#6f7b9b">Step Functions · Bedrock</text>
+
+  <!-- The Warden -->
+  <rect x="660" y="100" width="180" height="100" rx="14" fill="#232b45" stroke="#e4586b" stroke-opacity="0.4"/>
+  <circle cx="686" cy="126" r="4" fill="#e4586b"/>
+  <text x="698" y="131" font-family="ui-sans-serif, system-ui" font-size="15" font-weight="600" fill="#edeff7">The Warden</text>
+  <text x="676" y="152" font-family="ui-sans-serif, system-ui" font-size="12" fill="#a8b3cf">residency · holds</text>
+  <text x="676" y="170" font-family="ui-sans-serif, system-ui" font-size="12" fill="#a8b3cf">erasure · revoke</text>
+  <text x="676" y="188" font-family="ui-sans-serif, system-ui" font-size="11" fill="#e4586b" font-weight="600">no model, ever</text>
+
+  <!-- The Custodian -->
+  <rect x="660" y="280" width="180" height="100" rx="14" fill="#232b45" stroke="#36415f"/>
+  <circle cx="686" cy="306" r="4" fill="#8b7fd4"/>
+  <text x="698" y="311" font-family="ui-sans-serif, system-ui" font-size="15" font-weight="600" fill="#edeff7">The Custodian</text>
+  <text x="676" y="332" font-family="ui-sans-serif, system-ui" font-size="12" fill="#a8b3cf">Cloud MCP + ccloud</text>
+  <text x="676" y="350" font-family="ui-sans-serif, system-ui" font-size="12" fill="#a8b3cf">official Agent Skills</text>
+  <text x="676" y="368" font-family="ui-sans-serif, system-ui" font-size="11" fill="#6f7b9b">ECS Fargate · Bedrock</text>
+
+  <!-- thesis line -->
+  <text x="450" y="470" text-anchor="middle" font-family="ui-sans-serif, system-ui" font-size="17" font-weight="600" fill="#edeff7">The only component that can destroy memory has no model in it.</text>
+  <text x="450" y="498" text-anchor="middle" font-family="ui-sans-serif, system-ui" font-size="13" fill="#a8b3cf">Enforced by database role grants, an IAM deny, and a CI check on the Warden's import graph — not by policy.</text>
+
+  <!-- legend -->
+  <g font-family="ui-sans-serif, system-ui" font-size="11" fill="#6f7b9b">
+    <circle cx="330" cy="530" r="3.5" fill="#f2a65a"/>
+    <text x="340" y="534">writes memory</text>
+    <circle cx="440" cy="530" r="3.5" fill="#e4586b"/>
+    <text x="450" y="534">destroys memory</text>
+    <circle cx="565" cy="530" r="3.5" fill="#8b7fd4"/>
+    <text x="575" y="534">contains a model</text>
+  </g>
+</svg>

@@ -1,11 +1,11 @@
 # AGENTS.md — Instructions for the executing agent
 
-You are building **Mnemos — Accountable Memory for Agents** for the
-CockroachDB × AWS hackathon (deadline **Aug 19, 2026**). Read
-`MASTER_PLAN.md` first — especially "The thesis" and "The three pillars" —
-then execute `PHASE_01` → `PHASE_12` strictly in order. Do not begin a phase
-until the previous phase's Definition of Done is fully checked. Read
-`docs/architecture.md` and `db/mnemos_schema.sql` before writing any code.
+**Mnemos — Accountable Memory for Agents**, built for the CockroachDB × AWS
+"Build with Agentic Memory" hackathon. The build is complete and submitted;
+this file is the durable engineering contract for any further work on it —
+the invariants that must never regress, the language discipline that keeps
+the README honest, and the rules that made `make check` green in the first
+place. Read `docs/architecture.md` and `README.md` before touching code.
 
 Mnemos is not a memory store with governance bolted on. Governance is the
 product; the memory tiers are the substrate. When a design decision trades
@@ -53,22 +53,22 @@ weakness. The team that discloses its GC window beats the team that gets
 caught not knowing about it.
 
 ## When to STOP and ask the user
-Each phase file has an "Inputs needed from the user" block. When you reach
-one, ask for exactly those items and wait. Never fabricate, guess, or
-placeholder-commit credentials, connection strings, API keys, cluster IDs,
-account/region choices, or brand approvals. Also stop and ask before: any
-spend beyond agreed budgets, deleting any cloud resource, force-pushing, or
-**creating the S3 Object Lock bucket** (compliance-mode objects genuinely
-cannot be deleted until retention expires — the user must approve knowingly).
+Never fabricate, guess, or placeholder-commit credentials, connection
+strings, API keys, cluster IDs, account/region choices, or brand approvals.
+Stop and ask before: any spend beyond agreed budgets, deleting any cloud
+resource, force-pushing, opening or merging a pull request against a
+third-party repository under the user's identity, or creating a new S3
+Object Lock bucket (compliance-mode objects genuinely cannot be deleted
+until retention expires — the user must approve knowingly).
 
 ## Engineering rules
 - Secrets: local `.env` (gitignored) + AWS Secrets Manager. `.env.example`
   current. gitleaks in CI and before every push.
 - Every CockroachDB transaction goes through the retry wrapper (40001 →
   bounded exponential backoff). No naked transactions. Ever.
-- Tests land with code; CI green closes a sub-phase. Acceptance criteria in
-  the phase files ARE the tests — implement them literally, not in spirit.
-- **Verify DDL against the real cluster version on day one of Phase 02.**
+- Tests land with code; `make check` must stay green — that is the whole
+  quality bar, not a suggestion.
+- **Verify DDL against the real cluster version before relying on it.**
   `VECTOR INDEX` (C-SPANN), `TSVECTOR`, `REGIONAL BY ROW`, RLS policy syntax,
   and trigger/UDF support all drift across 25.x/26.x. Do not trust memory or
   this document over the live cluster — record findings in ADR-006.
@@ -83,10 +83,10 @@ cannot be deleted until retention expires — the user must approve knowingly).
   reading memory, ember amber = writing/consolidating, signal red =
   destruction, umbra violet = doubt (quarantined, contested, unverified).
   Never introduce new colors or fonts.
-- Write ADRs in `docs/decisions.md` for any deviation from the phase files,
-  and get user approval for the deviation first.
-- Conventional commits; small PRs per sub-phase; PR description links the
-  phase + sub-phase number.
+- Write ADRs in `docs/decisions.md` for any deviation from the architecture
+  or invariants documented here, and get user approval for the deviation
+  first.
+- Conventional commits; small, reviewable PRs.
 
 ## Reference documentation (consult these; do not rely on memory)
 - Hackathon brief + rules: https://cockroachdb-aws.devpost.com/
@@ -100,7 +100,9 @@ cannot be deleted until retention expires — the user must approve knowingly).
   window is bounded by GC; read this before promising time travel
 - Change data capture (CHANGEFEED) — revocation propagation, console live feed
 - Row-Level TTL — episodic decay
-- Agent Skills repo (vendor pinned; target of our Phase 11 PRs):
+- Agent Skills repo (five skills vendor-pinned in `services/custodian`; two
+  contributed upstream, PRs [#27](https://github.com/cockroachlabs/cockroachdb-skills/pull/27)
+  and [#28](https://github.com/cockroachlabs/cockroachdb-skills/pull/28)):
   https://github.com/cockroachlabs/cockroachdb-skills
 - LangChain integration (AsyncCockroachDBVectorStore, HybridSearchConfig,
   chat history, LangGraph checkpointer + TTL):
@@ -109,14 +111,16 @@ cannot be deleted until retention expires — the user must approve knowingly).
   and key deletion semantics, S3 Object Lock compliance mode, Step Functions
 - Community Slack for blockers: https://www.cockroachlabs.com/join-community/
 
-## Definition of "done" for the whole project
-Phase 12's judge simulation passes: a stranger on a fresh machine, following
-only README.md, reaches a working demo and can independently verify a
-deposition against the S3-anchored Merkle root. Submission complete ≥24h
-before the deadline.
+## The standard any change must still meet
+A stranger on a fresh machine, following only `README.md`, must be able to
+reach the live console, run `make smoke` against the deployed instance, and
+independently verify a deposition against the S3-anchored Merkle root. Any
+change that breaks that path — a stale link, a claim the code no longer
+backs, a broken quickstart command — is a regression, full stop, judged by
+the same standard `PHASE_12_SUBMISSION.md`'s judge-simulation step used
+before that file was retired from the repo.
 
-If schedule pressure ever forces cuts, cut in this order:
-procedural memory tier → third demo vertical → residency console map.
-**NEVER cut:** the Warden's erasure + attestation path, blast-radius
-revocation, temporal recall, or the Custodian. Those four are the entire
-differentiation.
+**Never cut, weaken, or leave undocumented:** the Warden's erasure +
+attestation path, blast-radius revocation, temporal recall, or the
+Custodian's read-only guarantee. Those four are the entire differentiation
+this project has over a plain vector store.
