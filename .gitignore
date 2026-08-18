@@ -50,3 +50,5 @@ bench/results/*.raw
 .vscode/
 !.vscode/extensions.json
 .impeccable/hook.cache.json
+.vercel
+.env*
