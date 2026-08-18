@@ -46,7 +46,7 @@
   <text x="98" y="311" font-family="ui-sans-serif, system-ui" font-size="15" font-weight="600" fill="#edeff7">Sleep Cycle</text>
   <text x="76" y="332" font-family="ui-sans-serif, system-ui" font-size="12" fill="#a8b3cf">distill · corroborate</text>
   <text x="76" y="350" font-family="ui-sans-serif, system-ui" font-size="12" fill="#a8b3cf">promote · decay</text>
-  <text x="76" y="368" font-family="ui-sans-serif, system-ui" font-size="11" fill="#6f7b9b">Step Functions · Bedrock</text>
+  <text x="76" y="368" font-family="ui-sans-serif, system-ui" font-size="11" fill="#6f7b9b">Step Functions · OpenAI</text>
 
   <!-- The Warden -->
   <rect x="660" y="100" width="180" height="100" rx="14" fill="#232b45" stroke="#e4586b" stroke-opacity="0.4"/>
@@ -62,7 +62,7 @@
   <text x="698" y="311" font-family="ui-sans-serif, system-ui" font-size="15" font-weight="600" fill="#edeff7">The Custodian</text>
   <text x="676" y="332" font-family="ui-sans-serif, system-ui" font-size="12" fill="#a8b3cf">Cloud MCP + ccloud</text>
   <text x="676" y="350" font-family="ui-sans-serif, system-ui" font-size="12" fill="#a8b3cf">official Agent Skills</text>
-  <text x="676" y="368" font-family="ui-sans-serif, system-ui" font-size="11" fill="#6f7b9b">ECS Fargate · Bedrock</text>
+  <text x="676" y="368" font-family="ui-sans-serif, system-ui" font-size="11" fill="#6f7b9b">ECS Fargate · OpenAI</text>
 
   <!-- thesis line -->
   <text x="450" y="470" text-anchor="middle" font-family="ui-sans-serif, system-ui" font-size="17" font-weight="600" fill="#edeff7">The only component that can destroy memory has no model in it.</text>

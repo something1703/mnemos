@@ -297,3 +297,39 @@ specific bucket's contents survive at minimum through 2026-08-15 — safely
 past both the hackathon deadline and the judging window — and the bucket
 cannot be deleted or emptied before then even if the project is torn down
 early.
+
+---
+
+## ADR-014 — Model calls run on OpenAI, not Amazon Bedrock
+
+**Context.** The original plan called for Bedrock (Claude for distillation
+and contradiction judging, Titan Embed v2 for embeddings), and early
+documentation — including this project's own README at points during the
+build — said so. `docs/accounts.md`'s "still to provision" checklist has
+carried an unchecked "Bedrock model access" item since account setup:
+Bedrock model access requires an AWS account-level approval step that adds
+real latency, and the interpretation layer (`mnemos_engine.llm`) was
+deliberately built provider-agnostic from Phase 03 specifically so a stalled
+approval wouldn't block the rest of the build. It stalled; the substitution
+was used, and — this is the part worth stating plainly — several docs kept
+saying "Bedrock" anyway, including two files written during a later design
+pass on this same repo that repeated the same stale claim without checking
+`/health` first.
+
+**Decision.** Ship on OpenAI (`gpt-5.6-luna` for distillation and Custodian
+interpretation, `text-embedding-3-small` for embeddings), reachable and
+confirmed at `GET /health`'s `posture.model_provider`. Every doc making an
+AWS-service claim about model calls is corrected to say so, rather than
+left to be discovered by a judge who actually checks the endpoint the
+README itself tells them to check.
+
+**Consequences.** The hackathon's AWS-services requirement is still met —
+comfortably — on Lambda, Step Functions, ECS Fargate, S3 + Object Lock,
+KMS, EventBridge, CloudWatch, API Gateway, and Secrets Manager, none of
+which this ADR touches. What it costs is one AWS-services rubric line this
+project cannot honestly claim. The trade against silently keeping the
+Bedrock claim was never close: a claim a judge can falsify with one `curl`
+is worse than the true version of the same sentence. `mnemos_engine.llm`
+being provider-agnostic by design (Phase 03, not a retrofit) is also why
+this substitution cost nothing structurally — swapping the provider back,
+if Bedrock access clears, is a config change, not a rewrite.

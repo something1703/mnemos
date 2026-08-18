@@ -3,36 +3,39 @@
 One CockroachDB cluster, four planes, exactly one of which contains a model.
 
 ```
-                          ┌─────────────────────────────────────────┐
-                          │            CockroachDB Cloud             │
-                          │   (episodes · facts · provenance · ledger)│
-                          └───────┬──────────┬──────────┬───────────┘
-                                  │          │          │
-        writes, 0 AI work        │          │          │  destructive ops only
-        ┌─────────────────────┐  │          │          │  ┌──────────────────────┐
-        │   THE FABRIC         │◄─┘          │          └─►│   THE WARDEN          │
-        │   (Lambda, MCP API)  │             │             │   (Lambda, own role)  │
-        │   remember()          │             │             │   residency · holds   │
-        │   recall()             │             │             │   erasure · revoke    │
-        └───────────┬──────────┘             │             │   no model, ever       │
-                    │                        │             └──────────────────────┘
-        async, on a schedule                 │
-        ┌───────────▼──────────┐             │
-        │   THE SLEEP CYCLE     │             │            ┌──────────────────────┐
-        │   (Step Functions)    │             │            │   THE CUSTODIAN        │
-        │   distill · corroborate│            │            │   (ECS Fargate)        │
-        │   promote · decay      │            └────────────┤   Cloud MCP + ccloud   │
-        │   (Bedrock here)       │  findings, unverified    │   Agent Skills, RO      │
-        └────────────────────────┘  like everything else    │   (Bedrock here)       │
-                                                              └──────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│                  CockroachDB Cloud                    │
+│        episodes · facts · provenance · ledger         │
+└──────────────────────────────────────────────────────┘
+
+┌────────────────────────┐    ┌────────────────────────┐
+│       THE FABRIC       │    │       THE WARDEN       │
+│   (Lambda, MCP API)    │    │   (Lambda, own role)   │
+│ remember() · recall()  │    │   residency · holds    │
+└────────────────────────┘    │    erasure · revoke    │
+                               │     no model, ever     │
+                               └────────────────────────┘
+
+┌────────────────────────┐    ┌────────────────────────┐
+│    THE SLEEP CYCLE     │    │     THE CUSTODIAN      │
+│    (Step Functions)    │    │     (ECS Fargate)      │
+│ distill · corroborate  │    │   Cloud MCP + ccloud   │
+│    promote · decay     │    │ Agent Skills, read-only│
+│     (OpenAI here)      │    │     (OpenAI here)      │
+└────────────────────────┘    └────────────────────────┘
 ```
 
-Two boxes call a model — the sleep cycle and the Custodian. Neither can reach
-the Warden's role, and both write everything they produce back into the
-Fabric as `unverified`, subject to the same corroboration gate as anything an
-agent wrote. `make no-model-in-warden` and `make no-warden-in-custodian`
-enforce the two edges this diagram deliberately does not draw, statically, in
-CI — not as a comment, as a build failure.
+All four boxes read and write the one cluster above them — the Fabric writes
+episodes (zero AI work); the Warden's connection is the only one with
+`DELETE`, used for residency, holds, erasure, and revocation; the Sleep
+Cycle distills episodes into facts asynchronously, on a schedule; the
+Custodian's writes are findings, landing `unverified` exactly like anything
+an agent wrote. Two boxes call a model — the Sleep Cycle and the Custodian.
+Neither can reach the Warden's role, and both write everything they produce
+back into the Fabric subject to the same corroboration gate as any agent's
+output. `make no-model-in-warden` and `make no-warden-in-custodian` enforce
+those two absent edges statically, in CI — not as a comment, as a build
+failure.
 
 ## The write path does zero AI work
 
@@ -50,7 +53,7 @@ candidate facts, run the corroboration gate (exact maximum bipartite
 matching over provenance edges — see [docs/trust.md](trust.md)), promote what
 earns it, decay what goes stale. Everything it writes lands `unverified` like
 anything an agent wrote; only a `system`/`operator`-provenance episode or two
-independently-sourced episodes earn promotion. This is the one place Bedrock
+independently-sourced episodes earn promotion. This is the one place OpenAI
 is called on the write side, and it is structurally incapable of promoting
 its own output — promotion is arithmetic in `packages/engine`, not a model's
 opinion of itself.

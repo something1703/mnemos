@@ -51,7 +51,7 @@ That is the argument for CockroachDB, made falsifiable.
 | **The Fabric** | Memory: episodic (Row-Level TTL) → semantic (C-SPANN vectors + full-text) → procedural | no |
 | **The Ledger** | Accountability: sharded hash chains, Merkle checkpoints anchored to S3 Object Lock, depositions | no |
 | **The Warden** | Governance: residency, legal hold, four erasure modes, blast-radius revocation, crypto-shred | **no — enforced by IAM, CI, and a runtime self-check** |
-| **The Custodian** | Self-maintenance: runs official CockroachDB Agent Skills over the Cloud MCP Server + `ccloud`, files findings back into memory | yes (Bedrock) |
+| **The Custodian** | Self-maintenance: runs official CockroachDB Agent Skills over the Cloud MCP Server + `ccloud`, files findings back into memory | yes (OpenAI, provider-agnostic — see ADR below) |
 
 **The only component that can destroy memory has no model in it.**
 
@@ -97,7 +97,7 @@ Each has a named test in `tests/invariants/`. Run `make invariants`.
 ![Mnemos architecture](docs/img/architecture.svg)
 
 The write path (Lambda) does **zero AI work** — memory intake survives a total
-Bedrock outage. All AI work happens asynchronously in the Step Functions sleep
+model-provider outage. All AI work happens asynchronously in the Step Functions sleep
 cycle. The Warden's operations connect through their own database role
 (`mnemos_warden_svc`) — the only one with `DELETE` — separate from the API's
 ordinary role, and that separation is measured at runtime, not assumed. The
@@ -245,7 +245,7 @@ published the attacks that succeeded alongside the ones that didn't.
 | **Agent Skills** | Five consumed (`triaging-live-sql-activity`, `profiling-statement-fingerprints`, `reviewing-cluster-health`, `analyzing-range-distribution`, `cockroachdb-sql` for continuous schema review) — and **two contributed upstream**, distilled from this build: [`designing-agentic-memory-schemas`](https://github.com/cockroachlabs/cockroachdb-skills/pull/27) (Query and Schema Design), [`auditing-agent-memory-with-as-of-system-time`](https://github.com/cockroachlabs/cockroachdb-skills/pull/28) (Security and Governance) |
 | **ccloud CLI** | Control-plane facts MCP cannot provide: cluster inventory, region topology feeding the residency map, and backup recency — which becomes a critical finding when it exceeds the tenant's RPO |
 | **Other CockroachDB depth** | `REGIONAL BY ROW` + survival goals, `AS OF SYSTEM TIME`, CHANGEFEED revocation bus, Row-Level TTL, RLS, DB-enforced audit trigger, serializable txns with 40001 retry, sharded chains benchmarked to 16× |
-| **AWS services** | **Bedrock** (distillation, contradiction judging, Titan Embed v2), **Lambda** (MCP API, consolidation, decay, Warden), **Step Functions** (sleep-cycle orchestration), **ECS Fargate** (Custodian), **EventBridge** (scheduling + alarm triggers), **S3 + Object Lock** (immutable Merkle anchoring), **KMS** (per-tenant envelope encryption, crypto-shred), **CloudWatch**, **API Gateway**, **Secrets Manager**, **Amplify** |
+| **AWS services** | **Lambda** (MCP API, consolidation, decay, Warden), **Step Functions** (sleep-cycle orchestration), **ECS Fargate** (Custodian), **EventBridge** (scheduling + alarm triggers), **S3 + Object Lock** (immutable Merkle anchoring), **KMS** (per-tenant envelope encryption, crypto-shred), **CloudWatch**, **API Gateway**, **Secrets Manager** — model calls (distillation, contradiction judging, embeddings) run on OpenAI, not Bedrock; the console is hosted on Vercel, not Amplify. Said plainly rather than left to be discovered. |
 | **Production readiness** | Five invariants with named tests; red-team suite with published failures; [security](docs/security.md) · [limits](docs/limits.md) · [runbook](docs/runbook.md) · [costs](docs/costs.md) — including what we have *not* tested yet, listed by name rather than left implicit |
 
 ## Resources & prior art
@@ -260,7 +260,7 @@ well, and precisely which of our claims are genuinely unmatched.
 - CockroachDB and AI: https://www.cockroachlabs.com/docs/v26.2/cockroachdb-and-ai
 - Agent Skills repo: https://github.com/cockroachlabs/cockroachdb-skills
 - LangChain integration: https://docs.langchain.com/oss/python/integrations/providers/cockroachdb
-- Amazon Bedrock: https://aws.amazon.com/bedrock/
+- OpenAI: https://platform.openai.com/docs
 
 ## Repository layout
 

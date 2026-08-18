@@ -145,7 +145,7 @@ Step Functions execution is failing or under-scheduled, not just running
 behind by a normal margin.
 
 **Remediation.** Check the Step Functions execution history for failures
-first (a Bedrock throttle or quota error is the most common real cause);
+first (an OpenAI rate-limit or quota error is the most common real cause);
 confirm `MNEMOS_MODEL_BUDGET_USD` has not been exhausted for the period. The
 write path is unaffected either way — this is a staleness problem, not a
 data-loss one.

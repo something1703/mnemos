@@ -97,7 +97,7 @@ Both directions, because they are equally real.
 ### 6. Availability and correctness under stress
 - 40001 storms on one subject key; `forget` interleaved with concurrent
   `remember` and `recall` on the same subject (the hardest correctness property
-  in the system); node kill mid-write; pipeline killed mid-execution; Bedrock
+  in the system); node kill mid-write; pipeline killed mid-execution; the model provider
   throttled to zero.
 - **Design control:** the write path does zero AI work, so memory intake
   survives a total model outage. Proven, not asserted.
