@@ -2,7 +2,10 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/primitives";
+import { ReadingProgress } from "@/components/ui/reading-progress";
 import { LifecycleDiagram } from "@/components/marketing/lifecycle-diagram";
+import { CorroborationMatchDiagram } from "@/components/marketing/corroboration-match-diagram";
+import { InvariantRow } from "@/components/marketing/invariant-row";
 
 export const metadata: Metadata = {
   title: "How it works",
@@ -41,15 +44,32 @@ const INVARIANTS = [
 export default function HowItWorksPage() {
   return (
     <>
-      <section className="mx-auto max-w-3xl px-5 pt-20 pb-12 text-center md:px-8">
-        <h1 className="mb-4 font-display text-4xl tracking-[-0.02em] text-parchment md:text-5xl">
-          How it works
-        </h1>
-        <p className="mx-auto max-w-xl text-moonstone">
-          Not a vector database with a memory label on it. A trust lattice, a jurisdiction, and a
-          tamper-evident record — built into one transactionally consistent database rather than
-          bolted on as three separate services.
-        </p>
+      <ReadingProgress />
+
+      {/* ------------------------------------------------------------ hero
+          A quieter version of the landing page's atmosphere — enough to
+          feel like the same site, restrained enough that a Read surface
+          doesn't compete with the words for attention the way a Persuade
+          hero is supposed to. */}
+      <section className="relative overflow-hidden">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-80"
+          style={{
+            background:
+              "radial-gradient(50% 60% at 50% 0%, rgb(111 227 210 / 9%), transparent 70%)",
+          }}
+        />
+        <div className="mx-auto max-w-3xl px-5 pt-20 pb-12 text-center md:px-8">
+          <h1 className="mb-4 font-display text-4xl tracking-[-0.02em] text-parchment md:text-5xl">
+            How it works
+          </h1>
+          <p className="mx-auto max-w-xl text-moonstone">
+            Not a vector database with a memory label on it. A trust lattice, a jurisdiction, and a
+            tamper-evident record — built into one transactionally consistent database rather than
+            bolted on as three separate services.
+          </p>
+        </div>
       </section>
 
       {/* --------------------------------------------------------- lifecycle */}
@@ -82,6 +102,13 @@ export default function HowItWorksPage() {
             a heuristic: sessions on one side, the four origin categories on the other, an edge
             wherever a session contributed that category at least once.
           </p>
+        </div>
+
+        <div className="my-8 rounded-lg border border-hairline bg-veil/40 px-4 py-6 md:px-6">
+          <CorroborationMatchDiagram />
+        </div>
+
+        <div className="flex flex-col gap-4 text-sm text-moonstone">
           <p>
             This is why an agent can never promote its own claim by repeating it. Ten episodes
             from the same channel, in ten different sessions, still fill only one slot in the
@@ -113,25 +140,21 @@ export default function HowItWorksPage() {
             stops being true.
           </p>
           <div className="divide-y divide-hairline border-y border-hairline">
-            {INVARIANTS.map((inv) => (
-              <div key={inv.n} className="flex items-start gap-4 py-4">
-                <span className="mt-0.5 shrink-0 font-mono text-xs text-synapse">{inv.n}</span>
-                <div className="flex flex-col gap-1">
-                  <p className="text-sm text-parchment">{inv.title}</p>
-                  <p className="text-xs text-moonstone">{inv.by}</p>
-                </div>
-              </div>
+            {INVARIANTS.map((inv, i) => (
+              <InvariantRow key={inv.n} n={inv.n} title={inv.title} by={inv.by} index={i} />
             ))}
           </div>
         </div>
       </section>
 
       {/* -------------------------------------------------------- containment */}
-      <section className="mx-auto max-w-3xl px-5 py-16 md:px-8">
-        <h2 className="mb-4 font-display text-2xl tracking-[-0.02em] text-parchment">
-          Prevention is bounded. Containment is the real control.
+      <section className="mx-auto max-w-2xl px-5 py-20 text-center md:px-8">
+        <h2 className="mb-6 font-display text-3xl tracking-[-0.02em] text-parchment md:text-4xl">
+          Prevention is bounded.
+          <br />
+          Containment is the real control.
         </h2>
-        <p className="text-sm text-moonstone">
+        <p className="text-left text-sm text-moonstone">
           Prompt-level defenses fail eventually — content is delimited and declared as data in
           every prompt, but that is not treated as sufficient on its own. When a source turns out
           to be malicious, <code className="rounded-sm bg-veil-hi px-1 py-0.5 font-mono text-xs text-parchment">revoke_source()</code>{" "}
