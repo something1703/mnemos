@@ -55,7 +55,7 @@ export function LedgerActivityChart({
   return (
     <div className={cn("flex flex-col gap-0", className)} style={{ height }}>
       {sorted.map((row, i) => {
-        const presentation = OP_PRESENTATION[row.op];
+        const presentation = OP_PRESENTATION[row.op] ?? OP_PRESENTATION.checkpoint;
         const colour = ACCENT_VAR[presentation.accent];
         const widthPct = scale(row.count);
         const isHovered = hovered === row.op;

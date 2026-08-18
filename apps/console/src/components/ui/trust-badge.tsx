@@ -80,7 +80,14 @@ export function TrustBadge({
   className?: string;
   showLabel?: boolean;
 }) {
-  const presentation = TRUST_PRESENTATION[trust];
+  // `trust` is typed as TrustState, but the value at runtime came over the
+  // wire from the API — a type annotation doesn't stop a stale seed row, an
+  // in-flight migration, or a future sixth state from reaching this
+  // component with a string TRUST_PRESENTATION has no entry for. Falling
+  // back to `unverified` (rather than crashing the whole screen) is the
+  // correct default for exactly this product: an unrecognized trust value
+  // gets treated as least-trusted, not as a page that stops rendering.
+  const presentation = TRUST_PRESENTATION[trust] ?? TRUST_PRESENTATION.unverified;
   const accent = ACCENT_CLASSES[presentation.accent];
   return (
     <span

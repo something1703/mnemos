@@ -75,7 +75,11 @@ export function Stat({
 /* -------------------------------------------------------- SeverityBadge --- */
 
 export function SeverityBadge({ severity }: { severity: Severity }) {
-  const presentation = SEVERITY_PRESENTATION[severity];
+  // Same reasoning as TrustBadge: `severity` is a runtime value from the
+  // API, not a value TypeScript actually constrains — an unrecognized
+  // string here should render as the least-alarming badge, not take down
+  // the Custodian findings screen.
+  const presentation = SEVERITY_PRESENTATION[severity] ?? SEVERITY_PRESENTATION.info;
   const accent = ACCENT_CLASSES[presentation.accent];
   return (
     <span
